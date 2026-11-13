@@ -1,0 +1,14 @@
+# 数据与缓存不入库
+data/
+cache/
+config.local.json
+_probe/
+*.log
+__pycache__/
+*.pyc
+.venv/
+
+# 打包产物
+dist/
+build/
+*.spec

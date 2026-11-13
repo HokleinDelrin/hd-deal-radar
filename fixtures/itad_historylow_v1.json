@@ -1,0 +1,26 @@
+[
+  {
+    "id": "018d937f-590c-728b-ac35-38bcff85f086",
+    "low": {
+      "shop": {"id": 61, "name": "Steam"},
+      "price": {"amount": 79.2, "amountInt": 7920, "currency": "CNY"},
+      "regular": {"amount": 198.0, "amountInt": 19800, "currency": "CNY"},
+      "cut": 60,
+      "timestamp": "2025-06-26T17:00:00Z"
+    }
+  },
+  {
+    "id": "018d937f-012f-73b8-ab2c-898516969e6a",
+    "low": {
+      "shop": {"id": 61, "name": "Steam"},
+      "price": {"amount": 3.0, "amountInt": 300, "currency": "CNY"},
+      "regular": {"amount": 37.0, "amountInt": 3700, "currency": "CNY"},
+      "cut": 92,
+      "timestamp": "2013-07-15T17:00:00Z"
+    }
+  },
+  {
+    "id": "018d937f-0000-7000-8000-0000000000ff",
+    "low": null
+  }
+]

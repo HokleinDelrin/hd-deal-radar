@@ -1,0 +1,17 @@
+{
+  "_说明": "复制成 config.local.json 再填。所有字段都可省略，省略就用 radar/config.py 里的默认值。",
+  "country": "cn",
+  "currency": "CNY",
+  "language": "schinese",
+  "rate_limit_sec": 1.2,
+  "cache_ttl_sec": 21600,
+  "host": "127.0.0.1",
+  "port": 8790,
+
+  "_itad_api_key": "可选。免费注册 https://isthereanydeal.com/apps/ 拿 key，填了就启用史低权威源",
+  "itad_api_key": "",
+
+  "_steam_api_key": "可选。https://steamcommunity.com/dev/apikey ；配合 steam_id 可导入你玩过的游戏",
+  "steam_api_key": "",
+  "steam_id": ""
+}

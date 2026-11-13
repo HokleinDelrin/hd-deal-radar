@@ -1,0 +1,53 @@
+[
+  {
+    "id": "018d937e-0000-7000-8000-000000000001",
+    "historyLow": {
+      "all": {"amount": 79.2, "amountInt": 7920, "currency": "CNY"},
+      "y1": {"amount": 99.0, "amountInt": 9900, "currency": "CNY"},
+      "m3": {"amount": 118.8, "amountInt": 11880, "currency": "CNY"}
+    },
+    "deals": [
+      {
+        "shop": {"id": 61, "name": "Steam"},
+        "price": {"amount": 99.0, "amountInt": 9900, "currency": "CNY"},
+        "regular": {"amount": 198.0, "amountInt": 19800, "currency": "CNY"},
+        "cut": 50,
+        "voucher": null,
+        "storeLow": {"amount": 79.2, "amountInt": 7920, "currency": "CNY"},
+        "flag": null,
+        "url": "https://store.steampowered.com/app/1245620/"
+      },
+      {
+        "shop": {"id": 11, "name": "Humble Store"},
+        "price": {"amount": 12.99, "amountInt": 1299, "currency": "USD"},
+        "regular": {"amount": 39.99, "amountInt": 3999, "currency": "USD"},
+        "cut": 68,
+        "voucher": null,
+        "storeLow": null,
+        "flag": null,
+        "url": "https://www.humblebundle.com/store/elden-ring"
+      },
+      {
+        "shop": {"id": 7, "name": "GOG"},
+        "price": {"amount": 89.0, "amountInt": 8900, "currency": "CNY"},
+        "regular": {"amount": 198.0, "amountInt": 19800, "currency": "CNY"},
+        "cut": 55,
+        "voucher": null,
+        "storeLow": null,
+        "flag": null,
+        "url": "https://www.gog.com/game/elden_ring"
+      },
+      {
+        "shop": {"id": 999, "name": "Region Locked Shop"},
+        "price": {"amount": null, "amountInt": null, "currency": "CNY"},
+        "regular": null,
+        "cut": 0,
+        "voucher": null,
+        "storeLow": null,
+        "flag": null,
+        "url": null
+      }
+    ],
+    "bundles": []
+  }
+]

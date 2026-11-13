@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>史低雷达 · game-deal-radar</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo">◎</span>
+    <div>
+      <h1>史低雷达</h1>
+      <p class="sub" id="stats">读取中…</p>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button data-tab="deals" class="active">史低榜</button>
+    <button data-tab="taste">我的口味</button>
+    <button data-tab="rec">推荐</button>
+    <button data-tab="free">免费</button>
+  </nav>
+  <!-- 提醒按钮必须放在 nav.tabs 外面：app.js 把 `.tabs button` 全部当成页签，放里面点了会把主体切空 -->
+  <button id="bell" class="bell" title="提醒中心（到点由全局汇总器统一推送）">提醒<span id="bell-badge" class="badge" hidden>0</span></button>
+</header>
+
+<div id="bell-panel" class="bell-panel" hidden>
+  <div class="bell-head"><b>提醒中心</b><button id="bell-close" title="关闭">×</button></div>
+  <div id="bell-list"></div>
+  <div class="bell-foot">这里记的是「跌到史低」的全部历史。系统通知每天到点由全局汇总器合并成一条，
+    所以即使 Windows 把弹窗吞了，你回到这个页面也一定看得到。</div>
+</div>
+
+<main>
+  <!-- 史低榜 -->
+  <section id="tab-deals" class="tab active">
+    <div class="toolbar">
+      <input id="q-deals" type="search" placeholder="搜游戏名（中英文都行）">
+      <select id="sort-deals">
+        <option value="worth">值得买（默认）</option>
+        <option value="at_low">先看史低</option>
+        <option value="discount">按折扣</option>
+        <option value="review">按好评率</option>
+        <option value="heybox">按小黑盒价</option>
+        <option value="price">按价格</option>
+        <option value="metacritic">按 MC 分</option>
+      </select>
+      <select id="cur-deals" title="币种：国区价来自 Steam，美元价来自 CheapShark 跨店比价">
+        <option value="CNY">国区 ¥</option>
+        <option value="USD">美元 $</option>
+      </select>
+      <label class="chk"><input type="checkbox" id="only-discount" checked> 只看打折</label>
+      <button id="btn-refresh" class="ghost" title="重新拉数据（走 python -m radar.cli fetch）">说明</button>
+    </div>
+    <div id="deals-hint" class="hint"></div>
+    <div id="deals" class="grid"></div>
+  </section>
+
+  <!-- 口味 -->
+  <section id="tab-taste" class="tab">
+    <div class="panel">
+      <h2>你玩过 / 喜欢什么</h2>
+      <p class="hint">只写名字也行（<code>只狼</code>、<code>Hades</code>），也可以补一句喜欢哪儿：
+        <code>只狼 — 喜欢招架和成就感，不要迷路</code>。写「不喜欢」的会反向扣分。</p>
+      <div class="adder">
+        <input id="taste-text" type="text" placeholder="只狼 喜欢招架手感，肉鸽卡牌也能接受">
+        <select id="taste-kind">
+          <option value="liked">喜欢</option>
+          <option value="disliked">不喜欢</option>
+        </select>
+        <input id="taste-weight" type="number" value="1" min="0.1" max="3" step="0.1" title="权重">
+        <button id="taste-add">加入</button>
+      </div>
+      <div id="taste-msg" class="msg"></div>
+      <div id="taste-list"></div>
+    </div>
+    <div class="panel">
+      <h2>画像长什么样</h2>
+      <div id="taste-tags" class="taglist"></div>
+      <div id="taste-resolved"></div>
+    </div>
+  </section>
+
+  <!-- 推荐 -->
+  <section id="tab-rec" class="tab">
+    <div class="toolbar">
+      <label class="chk"><input type="checkbox" id="rec-only-discount"> 只要打折的</label>
+      <input id="rec-top" type="number" value="30" min="5" max="100" step="5" title="数量">
+      <button id="rec-run">重新算</button>
+      <span id="rec-hint" class="hint"></span>
+    </div>
+    <div id="rec" class="grid"></div>
+  </section>
+
+  <!-- 免费 -->
+  <section id="tab-free" class="tab">
+    <p class="hint">Epic 每周免费 —— 史低的极端情形（0 元）。</p>
+    <div id="free" class="grid"></div>
+  </section>
+</main>
+
+<aside id="drawer" class="drawer">
+  <button id="drawer-close" class="close">×</button>
+  <div id="drawer-body"></div>
+</aside>
+
+<script src="/app.js"></script>
+<script src="/bell.js"></script>
+</body>
+</html>
