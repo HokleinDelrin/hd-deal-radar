@@ -134,3 +134,22 @@
 - 交接：HANDOVER 第 24 条已写清实测数据与下一步；README 顶部仍指向 `HANDOVER.md`。
 
 
+
+## 2026-11-14 · 发布 v1.0.0（首个公开版）
+
+- 发布前自检：`python -m radar.cli selftest` → 28 项 PASS / 0 FAIL；Web UI 实测 `GET /` 200（4443 B），
+  `/api/stats` `/api/deals` `/api/epic` `/api/profile` `/api/rec` `/api/search` 全 200。
+- **纠错**：README 与仓库 description 都写着「零第三方依赖」，实测屏蔽 `requests` 后 `radar.cli`
+  直接 ImportError —— 别人 clone 完第一条命令就崩。已加 `requirements.txt`（只列 requests）并改掉两处文案。
+- 修 preflight 扫描器本身的 3 个 bug（png 被当文本解码误报、`maxHits=40` 提前 break 导致后续文件没扫、
+  未纳入未跟踪文件），改完才抓到真命中：2 处本机路径字面量写在自检报告正文里。
+- README 修 8 处过期：零依赖×2、`dist/史低雷达.exe` 实际不在仓库、私有 notify-hub 路径混进标准命令、
+  缺 requirements、日期、HANDOVER 的「23 项」（实际 28）。
+- 发布：tag `v1.0.0`，Release 已上线 https://github.com/HokleinDelrin/hd-deal-radar/releases/tag/v1.0.0 ；
+  description 去掉「Zero dependencies」，topics 补 sqlite / price-history / itad。
+- 发布稿两审后改 6 处，与实测矛盾的地方按事实改：ITAD `/games/history/low/v2` 是 POST-only
+  （用 GET 打 404，原先写成「端点不存在」）；小黑盒那句「免费不用 key」改为如实说明
+  （签名按社区逆向复刻、用自己登录态、频次自负，QA.md 口径是「风险归位，不是合规化」）；
+  FF7 折扣不再写百分点（仓库记 -82%，33/198 复算 83.3%，口径不一致，改为「只剩标价六分之一」）。
+- Release notes 里 3 处硬错已改：自检覆盖 13 项 → 14 项；「28 项全部读 fixtures」→ 只有 #15–#19 读；
+  实测环境 Windows 11 → Windows 10 专业版；「其余 4 个源」→ Steam 特惠 / CheapShark / Epic。
