@@ -3,7 +3,7 @@
 > **Is this game at its all-time low right now — should I buy it today?**
 > 这个游戏现在是史低吗？我该现在买吗？
 
-跨平台 PC 游戏史低聚合 + 按你自己的游玩画像推荐。**纯 Python 标准库 + 原生 HTML/JS，零第三方依赖**，整个应用跑在你自己的电脑上。
+跨平台 PC 游戏史低聚合 + 按你自己的游玩画像推荐。**Python + 原生 HTML/JS，无构建、无前端依赖；后端只额外要一个 `requests`**，整个应用跑在你自己的电脑上。
 
 多数比价站算的是「相对原价的折扣百分比」。hd-deal-radar 算的是另外两件事：
 
@@ -11,6 +11,25 @@
 2. **「破史低」标记** —— 只有现价**低于 Steam 官方历史最低价**时才高亮（界面上写作「超史低」），其余老实标「史低」/「平史低」/「首采」，不糊你。
 
 ![史低榜](assets/shot-deals.png)
+
+<details open>
+<summary><b>30 秒速览（想直接跑就照这三行）</b></summary>
+
+```powershell
+git clone https://github.com/HokleinDelrin/hd-deal-radar.git && cd hd-deal-radar
+pip install -r requirements.txt        # 只有一个包：requests
+python -m radar.cli init; python -m radar.cli fetch --pages 1; python -m radar.cli serve
+```
+
+然后开 http://127.0.0.1:8790 。
+
+- **这是什么**：在你自己的电脑上盯住一批 PC 游戏，回答「今天这个价是不是史低、该不该现在买」，并按你玩过的游戏推荐正在打折的。
+- **前置条件**：Python 3.10+ 和 `requests`。**不需要任何 API key**（ITAD / Steam key 是可选增强）。
+- **唯一的可选登录**：小黑盒源（国内券后到手价）要你先登录自己的小黑盒账号；不登录就跳过这个源，其余照常。
+- 程序本身有没有坏：`python -m radar.cli selftest`（28 项离线断言，不联网）。
+
+</details>
+
 
 ## 它和 SteamDB / GG.deals / IsThereAnyDeal 差在哪
 
@@ -32,14 +51,18 @@
 
 ## 快速开始
 
-Python 3.10+，**零第三方依赖，不需要任何 API key 就能完整跑起来**。
+Python 3.10+。**唯一要装的东西是 `requests`，不需要任何 API key 就能跑起来**（ITAD / Steam key 都是可选增强）。
 
-**1. 拿代码**
+**1. 拿代码 + 装依赖**
 
 ```powershell
 git clone https://github.com/HokleinDelrin/hd-deal-radar.git
 cd hd-deal-radar
+pip install -r requirements.txt
 ```
+
+> 只装 `requests` 一个包。项目不用框架、不用前端构建、不用 node_modules。
+> 不装它会在第一条命令就 `ImportError: No module named 'requests'`（`radar/http.py` 的网络层用它）。
 
 **2. 建库 + 首次采集（约 2–4 分钟，实测 234 秒，逐条打进度）**
 
@@ -89,7 +112,7 @@ MIT License，见 `LICENSE`。
 > 交接文档：`HANDOVER.md`（新会话先读它再开工）
 
 **状态（2026-11-12）：** 可运行。采集 / 史低快照 / 画像 / 推荐 / 本地 Web UI 全链路打通，已用真实数据跑过。
-**最近更新：** 2026-11-12（ITAD 批量接入 + Steam 库导入收尾，详见 `HANDOVER.md`）
+**最近更新：** 2026-11-14（发布前自检：依赖声明纠错、README 私有路径清理，见 `docs/发布自检报告.md`；功能最后一次变更是 2026-11-12）
 
 ## 这个任务是干什么的
 
@@ -169,6 +192,9 @@ MIT License，见 `LICENSE`。
 
 `dist/史低雷达.exe`（约 17 MB，单文件）—— 双击就起服务、自动打开界面，并留一个小窗口：
 
+> ⚠️ **EXE 不在仓库里**（`dist/` 和 `*.spec` 已进 `.gitignore`，仓库里只有打包入口 `app.py`）。
+> clone 下来想用桌面版，得自己打包一次，命令见本节末尾。不想打包就 `python -m radar.cli serve`，功能完全一样。
+
 - **打开界面** / **更新数据**（后台跑一轮轻量采集）/ **退出**
 - **登录小黑盒** → **读取登录态**（见下节）
 - 数据在 `%LOCALAPPDATA%\GameDealRadar\data\radar.db`，不放在 EXE 旁边 —— 换 EXE 不丢库存。
@@ -229,17 +255,20 @@ python -m radar.cli daemon --at 09:30          # 常驻：到点自动选当天�
 python -m radar.cli daemon --once              # 调试：立刻跑一轮
 .\install-task.ps1 -DryRun                     # 或交给 Windows 计划任务：先 -DryRun 看命令，去掉即注册；-Unregister 卸载
 
-# 提醒（默认不打断你：攒着，到点由全局汇总器一次提醒）
+# 提醒（默认不打断你：攒着，到点由你自己配的汇总器一次提醒）
 python -m radar.cli notify                     # 只记进提醒中心 + 入队，不弹
 python -m radar.cli notify --now               # 真的要立刻弹一条
 python -m radar.cli notify --dry-run           # 只看会提醒什么
 python -m radar.cli notify --test              # 逐条通道自测：弹窗 + 声音 + 系统到底收没收到
-python "$env:USERPROFILE\.dsh\tools\notify-hub.py" flush   # 手动把积压合并成一条（每天 21:30 自动跑）
 
 # 推荐去重与限速
 python -m radar.cli rec --top 20 --diversity 0.3   # 把「同一批 tag 扎堆」的结果压掉
 python -m radar.cli fetch --specials 40 --concurrency 4   # appdetails 4 线程（实测 3.4× 加速，无 429）
 ```
+
+> 提醒队列的「定点汇总」那一步，写向 `~/.dsh/tools/notify-hub.py`（我自己的多应用汇总脚本，**不在本仓库里**）。
+> 你机器上没有这个文件时，`notify` 照样把提醒写进网页「提醒」面板，只是入队那一步跳过并打一行提示 ——
+> 不报错、不丢提醒。想要定时汇总，把 `notify --now` 挂进你自己的计划任务即可。
 
 **关于「史低」的正确预期**：Steam 官方不给历史价，所以第一天的库里「当前价 == 最低价」，
 界面上这时标 `首采` 而不是「史低」。跑满两轮采集之后才开始有真实的历史最低；

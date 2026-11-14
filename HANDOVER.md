@@ -13,7 +13,7 @@ Web UI 在 http://127.0.0.1:8790，Windows 计划任务 `game-deal-radar-daily` 
 
 ```powershell
 cd game-deal-radar
-python -m radar.cli selftest           # 离线自检（23 项断言，先跑这个确认没坏）
+python -m radar.cli selftest           # 离线自检（28 项断言，今天实测全通过；先跑这个确认没坏）
 python -m radar.cli serve              # 起界面 → http://127.0.0.1:8790
 python -m radar.cli rec --top 20       # 命令行看推荐
 python -m radar.cli keys               # 看 key 该填什么、现在能不能用
@@ -125,7 +125,8 @@ python -m radar.cli notify             # 把跌到史低的推出来（Windows �
 - CheapShark `games?id=` 要它自己的 gameID，传 Steam appid 404。
 - Windows 控制台 GBK：`python -c` 打印 ¥ 前先 `$env:PYTHONIOENCODING='utf-8'`。
 - 路径含 `&`（`Softwares&Tools`），PowerShell 里必须引号或走 workdir 参数。
-- 项目还没 `git commit` 过（用户没要求，别自作主张提交）。
+- 已 `git commit`（初始版本，remote 指向 `HokleinDelrin/hd-deal-radar`）；**push 前必须先跑
+  `open-source-lab/tools/preflight-scan.ps1`**，退出码 0 才发。
 
 ## 文档地图
 
