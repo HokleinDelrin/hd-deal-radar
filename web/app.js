@@ -20,6 +20,13 @@ const LOW_STATES = {
   equal: ["平史低", "low", "和之前记录的最低价格持平"],
   near: ["接近史低", "near", "离历史最低不到 10%"],
   first: ["首采", "", "只采到过一条价格，还谈不上史低"],
+  none: ["未分级", "", "有价格但还构不成任何史低信号"],
+};
+// 筛选按钮的顺序和短名。后端 api_deals() 的 low_state 取值就是这几个 key。
+const STATE_ORDER = ["super", "new", "equal", "near", "first", "none"];
+const STATE_SHORT = {
+  super: "超史低", new: "★星史低", equal: "平史低",
+  near: "接近史低", first: "首采", none: "未分级",
 };
 const lowBadge = (item) => {
   const s = LOW_STATES[item.low_state];
@@ -107,6 +114,73 @@ function card(item, opts = {}) {
   return c;
 }
 
+/* ---------- 史低等级筛选 ----------
+ * 默认全选（含「首采」）。理由：第一次装完只跑了半轮采集时，库里几乎全是「首采」，
+ * 默认只勾前三级 → 打开就是空页面，看起来像坏了。宁可默认把话说全，
+ * 再给「只看真史低 / 只看破纪录」两个一键预设。
+ * 选择存 localStorage：下次打开还是你上次的口径。
+ */
+const LS_STATES = "gdr.states";
+let selectedStates = new Set(STATE_ORDER);
+try {
+  const saved = JSON.parse(localStorage.getItem(LS_STATES) || "null");
+  if (Array.isArray(saved) && saved.length) {
+    selectedStates = new Set(saved.filter((s) => STATE_ORDER.includes(s)));
+    if (!selectedStates.size) selectedStates = new Set(STATE_ORDER);
+  }
+} catch (_e) { /* localStorage 不可用就用默认值，别让整个页面挂掉 */ }
+
+// ?states=super,new 深链：刷新/贴给别人也能复现同一套筛选（截图、报问题时用得上）
+try {
+  const qs = new URL(location.href).searchParams.get("states");
+  const arr = (qs || "").split(",").filter((s) => STATE_ORDER.includes(s));
+  if (arr.length) {
+    selectedStates = new Set(arr);
+    saveStates();
+  }
+} catch (_e) {}
+
+function saveStates() {
+  try { localStorage.setItem(LS_STATES, JSON.stringify([...selectedStates])); } catch (_e) {}
+}
+
+function renderStateChips(counts) {
+  const box = $("#state-chips");
+  box.innerHTML = "";
+  STATE_ORDER.forEach((s) => {
+    const n = (counts && counts[s]) || 0;
+    const b = el("button", "chip" + (selectedStates.has(s) ? " on" : "") + (s === "none" || s === "first" ? " plain" : ""));
+    b.innerHTML = `${STATE_SHORT[s]}<b>${n}</b>`;
+    b.title = `${LOW_STATES[s][2]}｜当前其它筛选条件下共 ${n} 条`;
+    b.addEventListener("click", () => {
+      if (selectedStates.has(s)) {
+        if (selectedStates.size === 1) return;   // 一个都不选等于空列表，没意义
+        selectedStates.delete(s);
+      } else {
+        selectedStates.add(s);
+      }
+      saveStates();
+      loadDeals();
+    });
+    box.appendChild(b);
+  });
+}
+
+const allStatesSelected = () => selectedStates.size === STATE_ORDER.length;
+
+document.querySelectorAll("[data-preset]").forEach((b) => {
+  b.addEventListener("click", () => {
+    const p = b.dataset.preset;
+    selectedStates = new Set(
+      p === "record" ? ["super", "new"]
+      : p === "low" ? ["super", "new", "equal"]
+      : STATE_ORDER,
+    );
+    saveStates();
+    loadDeals();
+  });
+});
+
 /* ---------- 史低榜 ---------- */
 let dealsTimer;
 async function loadDeals() {
@@ -114,13 +188,29 @@ async function loadDeals() {
   const sort = $("#sort-deals").value;
   const only = $("#only-discount").checked ? "1" : "0";
   const cur = $("#cur-deals").value;
+  const states = allStatesSelected() ? "" : [...selectedStates].join(",");
+  // 地址栏跟着筛选走：刷新还是这套口径，也能直接把链接发给别人复现
+  try {
+    const u = new URL(location.href);
+    if (states) u.searchParams.set("states", states); else u.searchParams.delete("states");
+    history.replaceState(null, "", u);
+  } catch (_e) {}
   const box = $("#deals");
   box.innerHTML = `<p class="hint">读取中…</p>`;
-  const d = await api(`/api/deals?sort=${sort}&q=${encodeURIComponent(q)}&discount_only=${only}&currency=${cur}&limit=120`);
+  const d = await api(`/api/deals?sort=${sort}&q=${encodeURIComponent(q)}&discount_only=${only}` +
+    `&currency=${cur}&states=${states}&limit=120`);
+  renderStateChips(d.state_counts);
   box.innerHTML = "";
-  $("#deals-hint").textContent = `命中 ${d.count} 个有价格记录的游戏（${cur === "USD" ? "美元 · 跨店比价" : "人民币 · Steam 国区"}）`;
+  const matched = d.matched != null ? d.matched : d.count;
+  const curName = cur === "USD" ? "美元 · 跨店比价" : "人民币 · Steam 国区";
+  const hidden = matched - d.count;
+  $("#deals-hint").textContent =
+    `命中 ${d.count} 个（${curName}）· 通过其它筛选的共 ${matched} 条` +
+    (hidden > 0 ? ` · 等级筛选隐藏了 ${hidden} 条` : "");
   if (!d.items.length) {
-    box.innerHTML = `<p class="hint">还没有数据。先在命令行跑一次采集：<code>python -m radar.cli fetch --pages 2 --specials 20 --epic</code></p>`;
+    box.innerHTML = `<p class="hint">${matched
+      ? "当前勾选的史低等级下没有游戏 —— 换个等级组合，或点上面的「全部」。"
+      : "还没有数据。启动时会自动采集一轮，也可以点右上角「立即更新」。"}</p>`;
     return;
   }
   d.items.forEach((it) => box.appendChild(card(it)));
@@ -132,9 +222,6 @@ $("#q-deals").addEventListener("input", () => {
 $("#sort-deals").addEventListener("change", loadDeals);
 $("#cur-deals").addEventListener("change", loadDeals);
 $("#only-discount").addEventListener("change", loadDeals);
-$("#btn-refresh").addEventListener("click", () => {
-  $("#deals-hint").textContent = "采集请在命令行跑：python -m radar.cli fetch --pages 2 --specials 20 --epic";
-});
 
 /* ---------- 口味 ---------- */
 async function loadTaste() {
@@ -326,6 +413,82 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") $("#drawer").classList.remove("open");
 });
 
+/* ---------- 采集状态（启动自动更新 / 手动补一刀） ---------- */
+let updTimer = null;
+let wasRunning = false;
+
+function paintUpdate(u) {
+  const dot = $("#upd-dot");
+  const txt = $("#upd-text");
+  dot.className = "dot" + (u.running ? " busy" : (u.last_ok === false ? " err" : u.last_ok ? " ok" : ""));
+  // 这两句是用户直接看的状态，别改成别的口径
+  txt.textContent = u.running
+    ? (u.last_at ? `上次更新 于 ${u.last_at} · 正在更新中…` : "首次采集进行中…（还没有跑完过一轮）")
+    : (u.last_at ? `上次更新 于 ${u.last_at}` : "还没采集过");
+  const bits = [];
+  if (u.argv?.length) bits.push(`采集参数：${u.argv.join(" ")}`);
+  if (u.gap_min) bits.push(`自动更新最小间隔：${u.gap_min} 分钟`);
+  if (u.last_at && !u.running) bits.push(`上一轮耗时 ${u.last_seconds ?? "?"} 秒（${u.last_reason === "manual" ? "手动" : "自动"}触发）`);
+  if (u.last_ok === false) bits.push(`上一轮失败：${u.last_error || "返回码 " + u.last_code}`);
+  if (!u.running && u.cooldown_left_min > 0) bits.push(`冷却中：还要 ${u.cooldown_left_min} 分钟才会自动更新`);
+  txt.title = bits.join("\n");
+  const btn = $("#btn-update");
+  btn.disabled = !!u.running;
+  btn.textContent = u.running ? "更新中…" : "立即更新";
+}
+
+async function pollUpdate() {
+  let u;
+  try {
+    u = await api("/api/update");
+  } catch (_e) {
+    return;                     // 服务正在退出时这里会失败，不要当成错误刷屏
+  }
+  paintUpdate(u);
+  const flippedOff = wasRunning && !u.running;
+  const flippedOn = !wasRunning && u.running;
+  wasRunning = !!u.running;
+  if (flippedOn) loadStats();
+  if (flippedOff) { loadStats(); loadDeals(); }   // 新价格已落库，重拉一遍
+  clearTimeout(updTimer);
+  updTimer = setTimeout(pollUpdate, u.running ? 1500 : 15000);
+}
+
+$("#btn-update").addEventListener("click", async () => {
+  const r = await api("/api/update", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  if (r.started) {
+    wasRunning = true;
+    paintUpdate(r.status || { running: true });
+    clearTimeout(updTimer);
+    updTimer = setTimeout(pollUpdate, 800);
+  } else if (r.why === "running") {
+    $("#deals-hint").textContent = "已经在采集了，等这一轮跑完。";
+  } else {
+    $("#deals-hint").textContent = `这轮没起来（${r.why}）。`;
+  }
+});
+
+$("#btn-quit").addEventListener("click", async () => {
+  if (!confirm("退出史低雷达？本地服务会停止，这个页面随即失效。\n（下次双击图标再开）")) return;
+  const r = await api("/api/quit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Radar-Quit": "1" },
+    body: "{}",
+  });
+  if (r.ok) {
+    document.body.insertAdjacentHTML(
+      "afterbegin",
+      `<div class="bye">服务已退出，可以关掉这个标签页。</div>`,
+    );
+    clearTimeout(updTimer);
+  }
+});
+
 /* ---------- 启动 ---------- */
 loadStats();
 loadDeals();
+pollUpdate();

@@ -153,3 +153,49 @@
   FF7 折扣不再写百分点（仓库记 -82%，33/198 复算 83.3%，口径不一致，改为「只剩标价六分之一」）。
 - Release notes 里 3 处硬错已改：自检覆盖 13 项 → 14 项；「28 项全部读 fixtures」→ 只有 #15–#19 读；
   实测环境 Windows 11 → Windows 10 专业版；「其余 4 个源」→ Steam 特惠 / CheapShark / Epic。
+
+## 2026-11-15 · 桌面版去掉小窗，改托盘 + 自动更新 + 史低等级筛选
+
+- `app.py` 重写：不再 import tkinter，双击 = 起服务 → 开界面 → 通知区一个 ◎ 图标；
+  菜单 打开界面 / 立即更新数据 / 小黑盒（登录、读取登录态） / 退出，双击图标 = 打开界面。
+  「关这个窗口 = 停止服务」那句随窗口一起消失。
+- 新增 `radar/tray.py`：ctypes 调 `Shell_NotifyIconW`，隐藏消息窗口收 `WM_TRAY`，
+  图标 32×32 由 `struct` 手拼 ICO（4×4 超采样），失败退回 `IDI_APPLICATION`；不引入 pystray / Pillow。
+  `_probe/tray_probe.py` 实测：`NIM_ADD` → True、右键路由到菜单 → True、菜单项 4 条（含 1 条分隔线、
+  1 条置灰）、双击回调触发、`stop()` 后消息循环干净退出。
+- 新增 `radar/updater.py` + `GET/POST /api/update`：启动自动跑
+  `fetch --specials 20 --pages 0 --heybox 20`，间隔 30 分钟（`auto_fetch_gap_min`），状态落 `meta.fetch_state`。
+  实测：启动轮 34.5 秒 / `last_ok=true`；重启后 `[auto-fetch] 跳过（cooldown，还要等 27 分钟）`；
+  手动 POST 立刻开跑，连点第二次返回 `why=running`（54 ms，不再卡死）。
+- 修一个自己写出来的死锁：`Updater.start()` 在 `with self._lock` 里调 `self.status()`，
+  而 `status()` 也要这把非重入锁 → 第二次点「立即更新」把请求线程锁死（服务还在、点了没反应），
+  并且阻塞了采集线程最后的 `set_meta`。改成「锁内判定、锁外拼返回值」，实测两次 POST 共 54 ms。
+- 新增 `POST /api/quit`（要 `X-Radar-Quit: 1` 头）：带头 200 后进程退出、8790 端口释放；
+  不带头 400。托盘被折叠时的兜底退出。
+- 史低等级筛选：`/api/deals?states=super,new,equal` + 返回 `state_counts` / `matched`；
+  前端一排多选 chips 带条数、两个预设、`?states=` 深链、选择存 localStorage。
+  实测（只看打折）：全选 147 条 / `states=super` 15 条 / `states=super,new,equal` 91 条 / `states=none` 0 条。
+- 截图：`assets/shot-auto-update.png`（顶部「上次更新 于 2026-11-15 15:55」+ 等级条）、
+  `assets/shot-filter-record.png`（`?states=super,new` → 命中 15 个、隐藏 132 条）。
+- `python -m radar.cli selftest` 仍全通过（28 项）。
+
+## 2026-11-15 夜 · 重新打包 exe（第一次交付漏了这一步）
+
+- 用户反馈「打开后问题一个都没修，还是弹小窗」——原因是**只改了源码没重打包**：
+  `dist\史低雷达.exe` 还是 11-12 20:16 那个旧包（`app.py` 已经是 11-15 15:57 的新版）。
+  源码级验收通过不等于交付，交付物是 exe。
+- `史低雷达.spec` 补 `hiddenimports=['radar.tray','radar.updater','radar.server','radar.cli','radar.heybox_login']`
+  —— 托盘/调度/服务都是在函数里 import 的，显式声明一遍，避免打包版双击时 `ModuleNotFoundError`。
+- 重打包：`python -m PyInstaller --noconfirm --clean "史低雷达.spec"` → **21.7 秒**，
+  `dist\史低雷达.exe` **17.42 MB → 14.72 MB**（15,434,536 B，2026-11-15 21:17:07）。
+  变小是因为不再 import tkinter：`_tkinter` + tcl/tk 那几 MB 一起没了。
+- exe 实测（`_probe/exe_probe.ps1`，用 `EnumWindows` 从外部看，窗口模式没有 stdout）：
+  ① 新增可见窗口只有 `史低雷达 · game-deal-radar - Google Chrome` —— **没有 tkinter 小窗**，
+  也确认了浏览器真的被自动拉起（msedge/chrome 进程数 26 → 28）；
+  ② 隐藏窗口类 `GameDealRadarTray_37944_1725511911248` 存在 —— 托盘 `run()` 走到了 `_create()`，
+  `Shell_NotifyIconW(NIM_ADD)` 失败会抛异常把进程带走，进程活着即说明图标登记成功；
+  ③ `GET /api/update`：`running=true, reason=startup` → 21.5 秒后 `last_at=2026-11-15 21:18, last_ok=true`
+  （打包版自己的库 `%LOCALAPPDATA%\GameDealRadar\data\radar.db` mtime 21:18:05，263 游戏 / 3201 快照）；
+  ④ `POST /api/quit` 后：父进程 26324 与子进程 37944（onefile 的 bootloader 会起两层）都退出、
+  8790 端口释放、`Get-Process 史低雷达` 残留 0。
+- 教训已写进 AGENTS.md「踩坑记录」首条 + 「每次动手前必做」：动启动路径必须重打包并实测 exe，回报里写 mtime。

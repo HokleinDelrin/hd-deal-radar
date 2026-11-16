@@ -28,6 +28,8 @@
   但 `python -c "..."` 不经过这条路径，打印 ¥ 会 UnicodeEncodeError。跑 inline 脚本前先
   `$env:PYTHONIOENCODING='utf-8'`。
 - 路径里的 `&`（`Softwares&Tools`）在 PowerShell 里必须引号包住，或者直接用工具的 workdir 参数。
+- **改了 `app.py` / 任何启动路径上的东西，必须重新打包 `dist\史低雷达.exe` 并实测那个 exe** ——
+  用户双击的是 exe，不是 `.py`。只跑 `python app.py` 不算交付（见下面踩坑区第一条）。
 
 ## 已验证的接口形态（别再去踩）
 
@@ -62,6 +64,41 @@
 **同一个问题修到第三次**，改用 `../_lessons/07-重复失败.md` 的模板：先写「前三次各改了什么、是不是同一个假设、缺什么观测」，再动手。
 
 > 2026-11-14 之前的坑已由 `_lessons` 统一归档，本节从 2026-11-14 起生效。
+
+### 改了源码没重新打包 = 用户什么都没看到
+- 症状：用户双击 `dist\史低雷达.exe`，反馈「问题一个都没修，还是一进去弹小窗」；而 `python app.py` 明明已经没窗口了
+- 根因：交付物是 exe，源码只是原料。`dist/` 在 `.gitignore` 里，打包不是自动的，改完不打包，exe 的 mtime 还停在三天前
+- 下次判据：只要动了 `app.py` / `radar/` 里启动路径上的模块，收尾前必须
+  `python -m PyInstaller --noconfirm --clean "史低雷达.spec"`，然后**启动 dist 里那个 exe** 看四件事
+  （无窗口 / 网页自动开 / 自动开始采集 / 通知区有 ◎），回报里写明「跑过 dist 的 exe，mtime=…」
+- 出处：2026-11-15 第一次交付只改了源码，`dist\史低雷达.exe` 仍是 11-12 的旧包
+
+### 打包版是窗口模式，没有 stdout —— 只能从外部观测
+- 症状：exe 起来后看不到任何日志，`print` 全部无声，怀疑「到底跑没跑」
+- 根因：spec 里 `console=False`，`sys.stdout` 是 `None`，`print` 变成空操作（`cli.main` 的 reconfigure 也被 `hasattr` 挡掉了）
+- 下次判据：验收 exe 只认外部可观测的三样：`GET /api/update` 的 `running/last_at`、
+  `EnumWindows` 里有没有 `GameDealRadarTray_*` 隐藏窗口类（有 = 托盘 `run()` 走到了 `_create()`，
+  且 `NIM_ADD` 失败会抛异常把进程带走）、`dist` 那侧 DB 的 mtime。别指望日志
+- 出处：`_probe/exe_probe.ps1`（2026-11-15）
+
+### Updater 在 Lock 里调 status() → 第二次点「立即更新」把线程锁死
+- 症状：`POST /api/update` 第二次请求永不返回，其它接口正常；采集明明跑完了 `meta.fetch_state` 却不更新
+- 根因：`with self._lock:` 里调了 `self.status()`，而 `status()` 内部也要拿同一把 `threading.Lock`（非重入）
+- 下次判据：写完 `with self._lock` 后 grep 一遍块内每个方法调用，凡是自己也会 `with self._lock` 的一律挪到块外
+- 出处：`radar/updater.py` `start()`（2026-11-15）
+
+### 托盘/窗口 API 的参数不声明 argtypes，64 位句柄会被截断
+- 症状：ctypes 调用返回 0，但 `ctypes.get_last_error()` 也是 0，什么都看不出来
+- 根因：不设 `argtypes` 时 Python int 按 `c_int` 传，HWND/HICON 的高 32 位丢失
+- 下次判据：每加一个 user32/shell32 函数，先写 `argtypes/restype` 再调；句柄一律走 `wintypes.*`
+- 出处：`radar/tray.py` 顶部那一串 argtypes（2026-11-15）
+
+### 验收「双击会开浏览器」时，别真的把浏览器开起来
+- 症状：为验证 `app.py` 双击路径，浏览器窗口直接盖住用户正在跑的全屏游戏
+- 根因：`webbrowser.open()` 会真的拉起默认浏览器，没人能保证桌面此刻是空的
+- 下次判据：`$env:BROWSER='python X:/path/fake_browser.py %s'`（**必须正斜杠**：GenericBrowser 用
+  shlex 切命令，反斜杠会被当转义吃掉、路径拼成一坨），让它走假命令，只断言「调用了、URL 正确」
+- 出处：`_probe/fake_browser.py`（2026-11-15）
 
 ## 没修好的问题（2026-11-14 由总控会话统一归档）
 

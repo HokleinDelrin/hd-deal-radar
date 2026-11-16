@@ -13,6 +13,12 @@
     <div>
       <h1>史低雷达</h1>
       <p class="sub" id="stats">读取中…</p>
+      <p class="sub upd" id="upd">
+        <span class="dot" id="upd-dot"></span>
+        <span id="upd-text">检查采集状态…</span>
+        <button id="btn-update" class="mini">立即更新</button>
+        <button id="btn-quit" class="mini ghost" title="停止本地服务并退出（网页随之失效）。托盘图标里也有「退出」">退出服务</button>
+      </p>
     </div>
   </div>
   <nav class="tabs">
@@ -51,7 +57,14 @@
         <option value="USD">美元 $</option>
       </select>
       <label class="chk"><input type="checkbox" id="only-discount" checked> 只看打折</label>
-      <button id="btn-refresh" class="ghost" title="重新拉数据（走 python -m radar.cli fetch）">说明</button>
+    </div>
+    <div class="filters">
+      <span class="flabel">史低等级</span>
+      <div id="state-chips" class="chips"></div>
+      <span class="fsep"></span>
+      <button class="mini" data-preset="all" title="五个等级全选">全部</button>
+      <button class="mini" data-preset="record" title="超史低 + 星史低：真正刷了纪录的">只看破纪录</button>
+      <button class="mini" data-preset="low" title="超史低 + 星史低 + 平史低">只看真史低</button>
     </div>
     <div id="deals-hint" class="hint"></div>
     <div id="deals" class="grid"></div>

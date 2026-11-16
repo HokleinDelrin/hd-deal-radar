@@ -100,6 +100,11 @@ python -m radar.cli notify             # 把跌到史低的推出来（Windows �
       需要把「原价 / 券 / 史低 / 好评率 / 在线」几个字段从 `body.innerText` 里切出来（先用文本+正则，
       稳定后再改选择器）。
 
+25. **桌面版去窗口（2026-11-15）**：`app.py` 不再用 tkinter，服务生命周期交给通知区托盘
+    （`radar/tray.py`，ctypes 调 `Shell_NotifyIconW`，零依赖）；启动即自动采集一轮（`radar/updater.py`，
+    间隔 30 分钟），网页顶部常驻「上次更新 于 …」；史低等级加多选筛选（`?states=` + `state_counts`）。
+    详见 LOG.md 2026-11-15、QA.md 同日三条、`docs/数据源.md`「自动更新」。
+
 ## 还没做的（按价值排）
 
 1. **ITAD prices 还没跑过一次**：映射和解析都通了，但 `prices/v3` / `historylow/v1` 必须带 key。

@@ -145,6 +145,8 @@ MIT License，见 `LICENSE`。
 - [x] 默认排序「值得买」= 贝叶斯好评率 45% + 有效折扣 30% + 史低信号 25%
 - [x] 券快过期提醒：卡片显示「券剩 N 天」，≤3 天转黄
 - [x] 价格快照去重：同价不写新行，每天跑也不涨数据
+- [x] **史低等级筛选**：超史低 / ★星史低 / 平史低 / 接近史低 / 首采 一排多选按钮，各带条数（`?states=super,new` 可深链），
+      与搜索/排序/币种/「只看打折」叠加；另有「只看破纪录」「只看真史低」两个一键预设
 - [x] 定时采集分层：周一全量 / 其余日子轻量（`python -m radar.cli daemon --at 09:30` 或 `install-task.ps1`）
 - [x] `keys` 命令：写入并**在线校验** ITAD key / Steam key / steamID（含 profile 是否公开）
 - [x] ITAD 批量接入：`POST /games/prices/v3` + `POST /games/historylow/v1`，appid→uuid 映射落 meta 复用
@@ -183,6 +185,8 @@ MIT License，见 `LICENSE`。
 | `radar/recommend.py` | TF-IDF 索引、画像向量、余弦推荐、相似游戏 |
 | `radar/sources/` | 每个数据源一个文件 |
 | `radar/server.py` | 标准库 `http.server` 的 JSON API + 静态页 |
+| `radar/tray.py` | Windows 通知区托盘图标（ctypes 调 Shell_NotifyIconW，零依赖） |
+| `radar/updater.py` | 采集调度：启动自动跑一轮 + 间隔限制 + 状态给前端轮询 |
 | `radar/cli.py` | 命令行入口（init / fetch / harvest / enrich / add / profile / rec / low / serve / selftest） |
 | `web/` | 静态前端，原生 HTML/JS，无构建 |
 | `data/` | SQLite 库（不入 git） |
@@ -190,15 +194,26 @@ MIT License，见 `LICENSE`。
 
 ## 桌面版（不想碰命令行就用这个）
 
-`dist/史低雷达.exe`（约 17 MB，单文件）—— 双击就起服务、自动打开界面，并留一个小窗口：
+`dist/史低雷达.exe`（约 15 MB，单文件）—— 双击就起服务、自动打开界面，**没有窗口**，只在通知区留一个 ◎ 图标：
 
 > ⚠️ **EXE 不在仓库里**（`dist/` 和 `*.spec` 已进 `.gitignore`，仓库里只有打包入口 `app.py`）。
 > clone 下来想用桌面版，得自己打包一次，命令见本节末尾。不想打包就 `python -m radar.cli serve`，功能完全一样。
 
-- **打开界面** / **更新数据**（后台跑一轮轻量采集）/ **退出**
-- **登录小黑盒** → **读取登录态**（见下节）
+| 托盘（右键） | 作用 |
+|---|---|
+| 打开界面 | 再开一个浏览器标签（**双击图标**也是这个） |
+| 立即更新数据 | 手动补一轮采集；平时不用点，见下 |
+| 小黑盒：登录… / 读取登录态 | 登录一次，之后采集自动带登录态 |
+| 退出 | 删图标 + 停服务 + 进程结束 |
+
+- **启动就自动采集一轮**（后台线程，不挡网页打开），不用手动点。
+  距上次采集不足 **30 分钟**就跳过 —— 自动更新永远不比手动更频繁（依据见 `docs/数据源.md`「自动更新」）。
+  参数与旧版「更新数据」按钮一致：`fetch --specials 20 --pages 0 --heybox 20`。
+- 网页顶部常驻一行状态：`上次更新 于 2026-11-15 15:55`，采集中变成 `上次更新 于 … · 正在更新中…`。
+  旁边「立即更新」是手动补刀，「退出服务」是「托盘被系统折叠/找不到」时的退出兜底。
 - 数据在 `%LOCALAPPDATA%\GameDealRadar\data\radar.db`，不放在 EXE 旁边 —— 换 EXE 不丢库存。
   首次运行若 EXE 同级或上一级有 `data/radar.db`，会自动迁移一份过去。
+- 托盘是自己画的：`ctypes` 直调 `Shell_NotifyIconW`（`radar/tray.py`），**没装 pystray，也没装 Pillow**。
 
 重新打包：
 

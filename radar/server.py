@@ -10,16 +10,23 @@
   POST /api/profile/delete            {id}
   GET  /api/rec?top=&discount_only=
   GET  /api/search?q=
+  GET  /api/update                    采集状态（自动更新/手动更新共用）
+  POST /api/update                    手动触发一轮采集
+  POST /api/quit                      退出应用（要 X-Radar-Quit: 1 头，挡掉跨站误触）
 """
 from __future__ import annotations
 
 import json
 import mimetypes
+import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import config, db, recommend
+from . import updater as updater_mod
 from .sources import cheapshark, epic, steam
+
+_SERVER: ThreadingHTTPServer | None = None
 
 def _index():
     """统一走 `recommend.load_index()`：按 radar.db 的 mtime 失效，一落库就重建。
@@ -93,6 +100,8 @@ def api_deals(q: dict) -> dict:
     discount_only = (q.get("discount_only") or ["0"])[0] == "1"
     limit = int((q.get("limit") or ["80"])[0])
     currency = (q.get("currency") or [config.CFG["currency"]])[0]
+    # 史低等级多选：states=super,new,equal（空 = 全都要）
+    want = {s for s in ((q.get("states") or [""])[0] or "").split(",") if s}
 
     lows = db.lowest_map(currency)
     now = db.best_now(currency)
@@ -101,6 +110,8 @@ def api_deals(q: dict) -> dict:
         rows = c.execute("SELECT * FROM games").fetchall()
 
     out = []
+    state_counts: dict[str, int] = {}
+    matched = 0          # 过完「平台/价格/搜索/只看打折」但还没按等级筛的条数
     for g in rows:
         best = now.get(g["appid"])
         if not best:
@@ -125,6 +136,10 @@ def api_deals(q: dict) -> dict:
         eff_disc = (int(round((1 - cheapest / list_c) * 100))
                     if list_c and list_c > cheapest else int(best["discount"] or 0))
         state = _low_state(cheapest, prev_map.get((g["appid"], cheapest_shop)), steam_low, snap_n, low)
+        matched += 1
+        state_counts[state] = state_counts.get(state, 0) + 1
+        if want and state not in want:
+            continue
         item = {
             "appid": g["appid"],
             "name": name,
@@ -170,7 +185,13 @@ def api_deals(q: dict) -> dict:
         out.sort(key=lambda d: -(d["discount"] or 0))
     else:  # worth：默认
         out.sort(key=lambda d: -d["worth"])
-    return {"count": len(out), "items": out[:limit]}
+    return {
+        "count": len(out),
+        "matched": matched,                     # 只套了其它筛选、还没套等级筛选的条数
+        "state_counts": state_counts,           # 各等级各多少条（同样口径）—— 前端据此显示「超史低 3 · 星史低 7」
+        "states": sorted(want),
+        "items": out[:limit],
+    }
 
 
 def api_game(q: dict) -> dict:
@@ -345,6 +366,7 @@ class Handler(BaseHTTPRequestHandler):
                     "/api/rec": lambda: api_rec(q),
                     "/api/search": lambda: api_search(q),
                     "/api/notifications": lambda: api_notifications(q),
+                    "/api/update": lambda: {**updater_mod.get().status(), "can_quit": True},
                 }
                 fn = routes.get(path)
                 if fn is None:
@@ -380,15 +402,34 @@ class Handler(BaseHTTPRequestHandler):
             elif parsed.path == "/api/notifications/seen":
                 db.notify_mark_seen()
                 self._json({"ok": True, "unread": db.notify_unread()})
+            elif parsed.path == "/api/update":
+                # 手动触发：跳过「距上次不足 N 分钟」的间隔限制，但不允许两轮并行
+                self._json(updater_mod.get().start("manual", force=True))
+            elif parsed.path == "/api/quit":
+                # 自定义头 = 跨站请求必须走 preflight，而这里不应答 preflight，所以只有本站能触发
+                if self.headers.get("X-Radar-Quit") != "1":
+                    self._json({"error": "need_header", "detail": "缺少 X-Radar-Quit: 1"}, 400)
+                    return
+                self._json({"ok": True, "bye": "服务正在退出"})
+                threading.Thread(target=request_shutdown, daemon=True).start()
             else:
                 self._json({"error": "no_route", "path": parsed.path}, 404)
         except Exception as exc:
             self._json({"error": "exception", "detail": f"{type(exc).__name__}: {exc}"}, 500)
 
 
+def request_shutdown() -> None:
+    """从任意线程让 serve_forever() 返回（供 /api/quit 用）。"""
+    srv = _SERVER
+    if srv is not None:
+        threading.Thread(target=srv.shutdown, daemon=True).start()
+
+
 def serve(host: str = "127.0.0.1", port: int = 8790) -> None:
+    global _SERVER
     db.init()
     srv = ThreadingHTTPServer((host, port), Handler)
+    _SERVER = srv
     print(f"史低雷达 → http://{host}:{port}")
     try:
         srv.serve_forever()
@@ -396,3 +437,4 @@ def serve(host: str = "127.0.0.1", port: int = 8790) -> None:
         print("\n关闭")
     finally:
         srv.server_close()
+        _SERVER = None

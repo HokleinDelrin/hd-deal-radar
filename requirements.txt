@@ -1,3 +1,4 @@
 # 唯一的第三方依赖。网络层 radar/http.py 用它发请求、并支持多线程独立限速。
-# 其余全部是 Python 标准库（http.server / sqlite3 / urllib / tkinter ...）。
+# 其余全部是 Python 标准库（http.server / sqlite3 / urllib / ctypes ...）。
+# 托盘图标不用 pystray：radar/tray.py 直接 ctypes 调 Shell_NotifyIconW。
 requests>=2.25

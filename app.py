@@ -1,20 +1,28 @@
 """史低雷达 · 桌面启动器（打包成 EXE 后的入口）。
 
-双击就干三件事：起本地服务 → 自动打开界面 → 留一个小窗口告诉你它在跑、以及怎么退出。
+双击只做三件事：**起本地服务 → 自动打开界面 → 在通知区放一个托盘图标**。
+不再弹 tkinter 小窗：旧版那个窗上写着「关这个窗口 = 停止服务」，
+用户一关就变成「网页还开着、服务已经死了」—— 那是设计错误，不是用户操作错误。
 
-为什么不用「只有后台进程」：`--noconsole` 打包后没有控制台，用户看不见任何东西，
-也没法 Ctrl+C。留一个 tkinter 小窗（标准库，不额外增体积）比托盘图标省事，
-还能顺手放一个「更新数据」按钮 —— 不然每次采集都要去翻命令行。
+服务生命周期现在归托盘：
+- 右键菜单：打开界面 / 立即更新数据 / 小黑盒（登录、读取登录态） / 退出
+- 双击图标 = 打开界面
+- 退出 = 删图标 → 消息循环结束 → 进程退出（HTTP 服务是守护线程，随之结束）
+另留一条兜底：网页右上角「退出服务」（`POST /api/quit`）—— 托盘被系统折叠进溢出区、
+或者跑在非 Windows 上时，仍然关得掉。
+
+采集不再问用户：启动就在后台跑一轮（`radar/updater.py`，距上次不足 30 分钟则跳过），
+托盘菜单和网页里的「立即更新」都只是手动补一刀。
 """
 from __future__ import annotations
 
+import argparse
 import socket
 import sys
 import threading
+import time
 import webbrowser
 from pathlib import Path
-from tkinter import messagebox, ttk
-import tkinter as tk
 
 from radar import config, db
 
@@ -31,7 +39,6 @@ def _free_port(preferred: int = 8790) -> int:
 
 
 def _wait_ready(port: int, timeout: float = 15.0) -> bool:
-    import time
     deadline = time.time() + timeout
     while time.time() < deadline:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -40,118 +47,6 @@ def _wait_ready(port: int, timeout: float = 15.0) -> bool:
                 return True
         time.sleep(0.15)
     return False
-
-
-class App:
-    def __init__(self, port: int) -> None:
-        self.port = port
-        self.url = f"http://127.0.0.1:{port}"
-        self.root = tk.Tk()
-        self.root.title("史低雷达")
-        self.root.geometry("460x300")
-        self.root.minsize(420, 280)
-        self.root.protocol("WM_DELETE_WINDOW", self.quit)
-
-        tk.Label(self.root, text="史低雷达", font=("Microsoft YaHei UI", 16, "bold")).pack(pady=(16, 2))
-        tk.Label(self.root, text="正在本机运行，不需要联网以外的权限",
-                 font=("Microsoft YaHei UI", 9), fg="#666").pack()
-
-        self.stat = tk.Label(self.root, text="读取中…", font=("Microsoft YaHei UI", 9))
-        self.stat.pack(pady=(8, 4))
-
-        self.link = tk.Label(self.root, text=self.url, fg="#1a6fd4", cursor="hand2",
-                             font=("Consolas", 10, "underline"))
-        self.link.pack()
-        self.link.bind("<Button-1>", lambda _e: self.open_ui())
-
-        btns = tk.Frame(self.root)
-        btns.pack(pady=10)
-        ttk.Button(btns, text="打开界面", command=self.open_ui).grid(row=0, column=0, padx=4)
-        ttk.Button(btns, text="更新数据", command=self.refresh).grid(row=0, column=1, padx=4)
-
-        btns2 = tk.Frame(self.root)
-        btns2.pack(pady=2)
-        ttk.Button(btns2, text="登录小黑盒", command=self.heybox_open).grid(row=0, column=0, padx=4)
-        ttk.Button(btns2, text="读取登录态", command=self.heybox_grab).grid(row=0, column=1, padx=4)
-        ttk.Button(btns2, text="退出", command=self.quit).grid(row=0, column=2, padx=4)
-
-        self.hint = tk.Label(self.root, text="关这个窗口 = 停止服务", fg="#888",
-                             font=("Microsoft YaHei UI", 8))
-        self.hint.pack(side="bottom", pady=8)
-
-        self._refresh_stat()
-
-    # ---------- 动作 ----------
-    def open_ui(self) -> None:
-        webbrowser.open(self.url)
-
-    def refresh(self) -> None:
-        if getattr(self, "_busy", False):
-            return
-        self._busy = True
-        self.hint.config(text="正在更新，几分钟内别关窗口…", fg="#b06a00")
-
-        def work() -> None:
-            code = 0
-            err = ""
-            try:
-                from radar import cli
-                code = cli.main(["fetch", "--specials", "20", "--pages", "0", "--heybox", "20"])
-            except BaseException as exc:      # noqa: BLE001 — 界面上要能看见任何失败
-                err = f"{type(exc).__name__}: {exc}"
-            self.root.after(0, lambda: self._after_refresh(code, err))
-
-        threading.Thread(target=work, daemon=True).start()
-
-    def _after_refresh(self, code: int, err: str) -> None:
-        self._busy = False
-        self.hint.config(text="关这个窗口 = 停止服务", fg="#888")
-        self._refresh_stat()
-        if err:
-            messagebox.showerror("更新失败", err)
-        elif code != 0:
-            messagebox.showwarning("更新结束", f"采集返回码 {code}，可能有个别源失败了（界面里仍可看已有数据）")
-        else:
-            messagebox.showinfo("更新完成", "数据已更新，界面上刷新一下就能看到。")
-
-    def heybox_open(self) -> None:
-        """起一个独立 profile 的 Edge 让用户自己登录。不碰日常浏览器的数据。"""
-        from radar import heybox_login as hl
-        try:
-            created = hl.start_browser()
-        except Exception as exc:
-            messagebox.showerror("打开登录窗口失败", str(exc))
-            return
-        self.hint.config(text="在刚弹出的 Edge 里登录小黑盒，登录好后点「读取登录态」", fg="#b06a00")
-        if created is None:
-            self.hint.config(text="登录窗口已经开着，登录好后点「读取登录态」", fg="#b06a00")
-
-    def heybox_grab(self) -> None:
-        from radar import heybox_login as hl
-        try:
-            info = hl.save(hl.grab_cookies())
-        except Exception as exc:
-            messagebox.showerror("读取失败", f"{exc}\n\n先在「登录小黑盒」打开的窗口里完成登录，再点这里。")
-            return
-        self.hint.config(text="关这个窗口 = 停止服务", fg="#888")
-        messagebox.showinfo("已登录", f"已保存 {info['count']} 条 cookie。之后的采集会带上登录态。")
-        self._refresh_stat()
-
-    def _refresh_stat(self) -> None:
-        try:
-            s = db.stats()
-            from radar import heybox_login as hl
-            hb = "已登录" if hl.status().get("logged_in") else "未登录"
-            self.stat.config(text=f"游戏 {s.get('games', 0)} · 快照 {s.get('prices', 0)} · "
-                                  f"画像 {s.get('profile', 0)} 条 · 小黑盒{hb}")
-        except Exception as exc:
-            self.stat.config(text=f"数据库读取失败：{exc}")
-
-    def quit(self) -> None:
-        self.root.destroy()
-
-    def run(self) -> None:
-        self.root.mainloop()
 
 
 def _migrate_install() -> str | None:
@@ -173,20 +68,137 @@ def _migrate_install() -> str | None:
     return None
 
 
-def main() -> int:
+def _parse_args(argv: list[str] | None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(prog="史低雷达", description="双击即用的桌面入口；命令行参数只给调试用")
+    p.add_argument("--no-browser", action="store_true", help="不自动打开浏览器（调试 / 前台跑服务时用）")
+    p.add_argument("--port", type=int, default=0, help="指定端口（0 = 8790 起找空闲端口）")
+    p.add_argument("--no-update", action="store_true", help="启动时不自动采集一轮（只看已有数据）")
+    return p.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
     moved = _migrate_install()
     if moved:
         print(f"已从 {moved} 迁移数据库", file=sys.stderr)
     db.init()
-    port = _free_port(int(config.CFG.get("port") or 8790))
-    from radar.server import serve
-    threading.Thread(target=serve, kwargs={"host": "127.0.0.1", "port": port},
-                     daemon=True).start()
+    port = args.port or _free_port(int(config.CFG.get("port") or 8790))
+    url = f"http://127.0.0.1:{port}"
+
+    from radar import server, updater
+    from radar import tray as tray_mod
+
+    # 服务跑在守护线程：主线程要留给托盘消息循环（TrackPopupMenu 要求同线程）
+    stopped = threading.Event()
+    threading.Thread(
+        target=lambda: (server.serve(host="127.0.0.1", port=port), stopped.set()),
+        name="radar-http", daemon=True,
+    ).start()
     if not _wait_ready(port):
         print("服务没起来", file=sys.stderr)
         return 1
-    webbrowser.open(f"http://127.0.0.1:{port}")
-    App(port).run()
+
+    up = updater.get()
+    if not args.no_update:
+        first = up.start("startup")           # 后台线程，不挡开网页
+        if not first.get("started"):
+            st = first.get("status") or {}
+            left = first.get("cooldown_left_min")
+            print(f"[auto-fetch] 跳过（{first.get('why')}"
+                  f"{f'，还要等 {left} 分钟' if left else ''}）；上次更新 {st.get('last_at')}", file=sys.stderr)
+
+    if not args.no_browser:
+        webbrowser.open(url)
+
+    # ---------- 没有托盘（非 Windows）：靠网页里的「退出服务」或 Ctrl+C ----------
+    if not tray_mod.available():
+        print("当前系统没有通知区托盘，退出请按 Ctrl+C，或在网页里点「退出服务」", file=sys.stderr)
+        try:
+            while not stopped.wait(0.5):
+                pass
+        except KeyboardInterrupt:
+            pass
+        return 0
+
+    # ---------- 动作 ----------
+    def open_ui() -> None:
+        webbrowser.open(url)
+
+    def do_update() -> None:
+        r = up.start("manual", force=True)
+        if not r.get("started"):
+            if r.get("why") == "running":
+                tray_mod.message_box("已经在采集了，等这一轮跑完。")
+            else:
+                tray_mod.message_box(f"这轮没起来（{r.get('why')}）。")
+
+    def heybox_login() -> None:
+        from radar import heybox_login as hl
+        try:
+            created = hl.start_browser()
+        except Exception as exc:                       # noqa: BLE001
+            tray_mod.message_box(f"打开登录窗口失败：{exc}", error=True)
+            return
+        tray_mod.message_box(
+            "已打开独立的 Edge 窗口，登录小黑盒后，右键托盘 →「小黑盒：读取登录态」。"
+            if created is not None else
+            "登录窗口已经开着。登录好后，右键托盘 →「小黑盒：读取登录态」。")
+
+    def heybox_grab() -> None:
+        def work() -> None:
+            from radar import heybox_login as hl
+            try:
+                info = hl.save(hl.grab_cookies())
+                tray_mod.message_box(f"已保存 {info['count']} 条 cookie，之后的采集会带上登录态。")
+            except Exception as exc:                   # noqa: BLE001
+                tray_mod.message_box(f"读取失败：{exc}\n\n先在「小黑盒：登录…」打开的窗口里完成登录。",
+                                     error=True)
+        threading.Thread(target=work, name="radar-heybox", daemon=True).start()
+
+    def quit_app() -> None:
+        st = up.status()
+        if st.get("running") and not tray_mod.confirm_box(
+                "正在更新数据，现在退出会中断这一轮采集。仍要退出？", "史低雷达"):
+            return
+        t.stop()
+
+    def menu():
+        st = up.status()
+        running = st.get("running")
+        last = st.get("last_at")
+        if running:
+            status_line = f"正在更新…（{st.get('running_for_s', 0)} 秒）"
+        elif last:
+            status_line = f"上次更新 {last}"
+        else:
+            status_line = "还没采集过"
+        return [
+            ("打开界面", True, open_ui),
+            ("立即更新数据" if not running else "正在更新数据…", not running, do_update),
+            None,
+            ("小黑盒：登录…", True, heybox_login),
+            ("小黑盒：读取登录态", True, heybox_grab),
+            None,
+            (f"退出　（{status_line}）", True, quit_app),
+        ]
+
+    def tick() -> None:
+        """托盘 tooltip 每 5 秒跟着采集状态走 —— 不打开网页也能知道跑到哪了。"""
+        st = up.status()
+        if st.get("running"):
+            t.set_tip(f"史低雷达 · 正在更新数据…（{st.get('running_for_s', 0)} 秒）")
+        elif st.get("last_at"):
+            t.set_tip(f"史低雷达 · 上次更新 {st['last_at']}")
+        else:
+            t.set_tip("史低雷达 · 还没采集过")
+
+    t = tray_mod.Tray(tooltip=f"史低雷达 · {url}", menu_provider=menu,
+                      on_double_click=open_ui, on_refresh_tick=tick,
+                      on_ready=lambda: print("[tray] 通知区图标已登记", file=sys.stderr))
+    # 网页里点「退出服务」→ server.serve() 返回 → 这里顺手把托盘也收掉，别留个死图标
+    threading.Thread(target=lambda: (stopped.wait(), t.stop()),
+                     name="radar-watch", daemon=True).start()
+    t.run()          # 阻塞：消息循环，直到托盘「退出」或网页点了「退出服务」
     return 0
 
 

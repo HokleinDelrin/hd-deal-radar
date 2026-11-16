@@ -48,7 +48,7 @@ def enabled() -> bool:
 
 def skip_reason() -> str:
     if bool(config.CFG.get("heybox_require_login", True)) and not logged_in():
-        return "没有登录小黑盒：跑 `heybox-login`（或桌面窗口里点「登录小黑盒」）后再试"
+        return "没有登录小黑盒：跑 `heybox-login`（或右键通知区托盘 →「小黑盒：登录…」）后再试"
     return ""
 
 

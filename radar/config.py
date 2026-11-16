@@ -45,6 +45,8 @@ DEFAULTS = {
     # 服务
     "host": "127.0.0.1",
     "port": 8790,
+    # 启动自动采集的最小间隔（分钟）。自动更新不许比手动更频繁 —— 见 docs/数据源.md「自动更新」
+    "auto_fetch_gap_min": 30,
     # 可选 key
     "itad_api_key": "",
     "steam_api_key": "",
