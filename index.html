@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>史低雷达 · 这个游戏现在是不是史低</title>
+<style>
+  :root{
+    --bg:#0e1014; --panel:#171a21; --panel2:#1d2129; --line:#262b36;
+    --fg:#e8ebf2; --muted:#8d95a8; --dim:#6b7280;
+    --green:#3ddc84; --amber:#f5b83d; --blue:#60a5fa;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--fg);
+    font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  .wrap{width:100%;max-width:960px;margin:0 auto;padding:0 20px}
+  header{padding:44px 0 18px;border-bottom:1px solid var(--line)}
+  h1{
+    margin:0 0 10px;font-size:clamp(22px,4.4vw,34px);line-height:1.3;
+    letter-spacing:-.01em;font-weight:700;
+  }
+  h1 em{font-style:normal;color:var(--green)}
+  .sub{margin:0 0 22px;color:var(--muted);font-size:clamp(13px,2.6vw,15px)}
+  .sub code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.92em;color:var(--blue)}
+  .searchbar{position:relative;display:flex;gap:10px;align-items:center}
+  #q{
+    flex:1;min-width:0;width:100%;
+    background:var(--panel);color:var(--fg);
+    border:1px solid var(--line);border-radius:12px;
+    padding:15px 46px 15px 16px;font-size:17px;
+    outline:none;transition:border-color .15s,box-shadow .15s;
+    -webkit-appearance:none;appearance:none;
+  }
+  #q::placeholder{color:var(--dim)}
+  #q:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(61,220,132,.15)}
+  #q::-webkit-search-cancel-button{display:none}
+  #clear{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    width:30px;height:30px;border-radius:8px;border:0;cursor:pointer;
+    background:var(--panel2);color:var(--muted);font-size:16px;line-height:1;
+    display:none;
+  }
+  #clear:hover{color:var(--fg)}
+  #clear.on{display:block}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+  .chip{
+    border:1px solid var(--line);background:transparent;color:var(--muted);
+    border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;
+    font-family:inherit;
+  }
+  .chip:hover{color:var(--fg);border-color:#3a4252;background:var(--panel)}
+  .meta{margin:16px 0 0;color:var(--dim);font-size:12.5px;display:flex;flex-wrap:wrap;gap:6px 14px}
+  .meta b{color:var(--muted);font-weight:600}
+  main{padding:18px 0 8px}
+  #list{display:flex;flex-direction:column;gap:12px}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line);
+    border-radius:12px;padding:15px 16px;
+  }
+  .card.is-low{border-left-color:var(--green)}
+  .card.is-above{border-left-color:var(--amber)}
+  .head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 10px;margin-bottom:10px}
+  .name{margin:0;font-size:16.5px;font-weight:650;line-height:1.35;overflow-wrap:anywhere}
+  .name mark{background:rgba(61,220,132,.22);color:var(--green);border-radius:3px;padding:0 2px}
+  .en{color:var(--dim);font-size:12.5px;overflow-wrap:anywhere}
+  .tag{
+    margin-left:auto;font-size:12.5px;font-weight:600;border-radius:999px;
+    padding:3px 10px;white-space:nowrap;
+  }
+  .tag.low{color:var(--green);background:rgba(61,220,132,.12)}
+  .tag.above{color:var(--amber);background:rgba(245,184,61,.12)}
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .cell{background:var(--panel2);border-radius:9px;padding:9px 11px;min-width:0}
+  .k{display:block;color:var(--dim);font-size:11.5px;letter-spacing:.02em;margin-bottom:2px}
+  .v{display:block;font-size:18px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+  .v.low{color:var(--green)}
+  .v.above{color:var(--amber)}
+  .v.zero{color:var(--green)}
+  .date{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+  .foot{margin:10px 0 0;color:var(--dim);font-size:12.5px;overflow-wrap:anywhere}
+  .foot .wait{color:var(--muted)}
+  .empty{color:var(--muted);padding:26px 4px;font-size:14.5px;line-height:1.7}
+  .empty code{background:var(--panel2);padding:1px 5px;border-radius:4px;color:var(--blue)}
+  .more{color:var(--dim);font-size:13px;padding:12px 2px 2px}
+  footer{border-top:1px solid var(--line);margin-top:22px;padding:22px 0 42px;color:var(--muted);font-size:13px;line-height:1.75}
+  footer p{margin:0 0 8px}
+  footer .ph{color:var(--amber)}
+  footer .note{color:var(--dim);font-size:12px}
+  @media (max-width:560px){
+    header{padding:30px 0 14px}
+    .wrap{padding:0 14px}
+    .grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+    .cell{padding:8px}
+    .v{font-size:15.5px}
+    .date{font-size:10.5px}
+    .tag{margin-left:0;font-size:12px}
+    #q{font-size:16px;padding:13px 44px 13px 13px}
+    .card{padding:13px 12px}
+  }
+  @media (max-width:360px){
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid .cell:last-child{grid-column:span 2}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Steam 上你在等的那个游戏，<em>现在是不是史低</em>？</h1>
+    <p class="sub">输入名字，立刻看到：现在多少钱、历史最低多少钱、还差多少。数据在本机 <code>radar.db</code> 里，页面不联网。</p>
+    <div class="searchbar">
+      <input id="q" type="search" placeholder="试试：艾尔登法环 / 冰汽时代 / 无主之地2" autocomplete="off" spellcheck="false" aria-label="搜索游戏">
+      <button id="clear" type="button" aria-label="清空">✕</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="meta">
+      <span>内嵌 <b id="total"></b> 条 Steam 国区价格</span>
+      <span>采集窗口 <b>2026-11-09 → 11-18</b></span>
+      <span><b>0</b> 个网络请求</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="list"></div>
+  <div class="more" id="more"></div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>这个工具是本地跑的：Python + 标准库 Web UI，双击 exe 就打开，不需要装环境、不需要注册、不需要 key。</p>
+    <p>完整版在这里：<a class="ph" href="https://github.com/HokleinDelrin/hd-deal-radar" target="_blank" rel="noopener">github.com/HokleinDelrin/hd-deal-radar</a></p>
+    <p>联系方式：<span class="ph">待补（作者本人填写）</span></p>
+    <p class="note">口径：当前价 = 该游戏 Steam 国区最新一条快照；史低 = 本机快照最低价与官方史低（小黑盒口径）里更低的一个；后面标「小黑盒口径 · 无日期」的，是官方史低更低、但本机还没采到它成为史低那天的日期。</p>
+  </div>
+</footer>
+
+<script>
+const GAMES = [{"appid":1600,"cn":"危险水域","name":"危险水域","now":9.6,"list":48.0,"discount":80,"low":4.8,"low_date":null,"low_source":"官方口径","reviews":374,"snaps":1,"year":""},{"appid":3900,"cn":"文明4","name":"文明4","now":12.8,"list":64.0,"discount":80,"low":9.6,"low_date":null,"low_source":"官方口径","reviews":3375,"snaps":2,"year":""},{"appid":4560,"cn":"英雄连 遗产版","name":"英雄连 遗产版","now":23.6,"list":118.0,"discount":80,"low":13.0,"low_date":null,"low_source":"官方口径","reviews":6997,"snaps":2,"year":""},{"appid":6860,"cn":"杀手4：血钱","name":"杀手4：血钱","now":4.2,"list":42.0,"discount":90,"low":4.2,"low_date":"2026-11-09","low_source":"本地快照","reviews":14034,"snaps":2,"year":""},{"appid":8930,"cn":"文明5","name":"文明5","now":23.75,"list":95.0,"discount":75,"low":9.5,"low_date":null,"low_source":"官方口径","reviews":204265,"snaps":1,"year":""},{"appid":9340,"cn":"英雄连：抵抗前线","name":"英雄连：抵抗前线","now":14.0,"list":70.0,"discount":80,"low":13.0,"low_date":null,"low_source":"官方口径","reviews":1138,"snaps":2,"year":""},{"appid":49520,"cn":"无主之地2","name":"无主之地2","now":6.4,"list":64.0,"discount":90,"low":6.4,"low_date":"2026-11-09","low_source":"本地快照","reviews":295218,"snaps":3,"year":""},{"appid":91200,"cn":"异形：地球战区","name":"异形：地球战区","now":5.76,"list":36.0,"discount":84,"low":3.6,"low_date":null,"low_source":"官方口径","reviews":4640,"snaps":1,"year":""},{"appid":102600,"cn":"兽人必须死","name":"兽人必须死","now":9.25,"list":37.0,"discount":75,"low":7.0,"low_date":null,"low_source":"官方口径","reviews":8189,"snaps":1,"year":""},{"appid":115800,"cn":"猫头鹰男孩","name":"猫头鹰男孩","now":7.6,"list":76.0,"discount":90,"low":7.6,"low_date":"2026-11-09","low_source":"本地快照","reviews":5874,"snaps":2,"year":""},{"appid":200710,"cn":"火炬之光2","name":"火炬之光2","now":13.6,"list":68.0,"discount":80,"low":9.6,"low_date":null,"low_source":"官方口径","reviews":44341,"snaps":1,"year":""},{"appid":227300,"cn":"Euro Truck Simulator 2","name":"Euro Truck Simulator 2","now":23.24,"list":92.99,"discount":75,"low":8.8,"low_date":null,"low_source":"官方口径","reviews":867404,"snaps":1,"year":"2012"},{"appid":236730,"cn":"异形2","name":"异形2","now":4.8,"list":48.0,"discount":90,"low":4.8,"low_date":"2026-11-09","low_source":"本地快照","reviews":1028,"snaps":1,"year":""},{"appid":242820,"cn":"140","name":"140","now":4.4,"list":22.0,"discount":80,"low":4.0,"low_date":null,"low_source":"官方口径","reviews":4604,"snaps":2,"year":""},{"appid":261640,"cn":"无主之地：前传","name":"无主之地：前传","now":12.7,"list":127.0,"discount":90,"low":12.7,"low_date":"2026-11-09","low_source":"本地快照","reviews":42379,"snaps":1,"year":""},{"appid":274350,"cn":"多普希","name":"多普希","now":4.2,"list":42.0,"discount":90,"low":3.6,"low_date":null,"low_source":"官方口径","reviews":2033,"snaps":2,"year":""},{"appid":279900,"cn":"灵魂原理","name":"灵魂原理","now":6.8,"list":68.0,"discount":90,"low":6.8,"low_date":"2026-11-09","low_source":"本地快照","reviews":245,"snaps":1,"year":""},{"appid":282070,"cn":"这是我的战争","name":"这是我的战争","now":7.6,"list":76.0,"discount":90,"low":3.8,"low_date":null,"low_source":"官方口径","reviews":101740,"snaps":2,"year":""},{"appid":311210,"cn":"Call of Duty®: Black Ops III","name":"Call of Duty®: Black Ops III","now":74.5,"list":298.0,"discount":75,"low":74.5,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2015"},{"appid":323190,"cn":"冰汽时代","name":"冰汽时代","now":10.8,"list":108.0,"discount":90,"low":10.8,"low_date":"2026-11-09","low_source":"本地快照","reviews":123546,"snaps":2,"year":""},{"appid":323580,"cn":"巨人约顿","name":"巨人约顿","now":5.9,"list":59.0,"discount":90,"low":5.8,"low_date":null,"low_source":"官方口径","reviews":8441,"snaps":2,"year":""},{"appid":330020,"cn":"莫塔守山人","name":"莫塔守山人","now":12.0,"list":80.0,"discount":85,"low":8.0,"low_date":null,"low_source":"官方口径","reviews":20966,"snaps":1,"year":""},{"appid":355790,"cn":"冥河：黑暗碎片","name":"冥河：黑暗碎片","now":7.8,"list":78.0,"discount":90,"low":5.5,"low_date":null,"low_source":"官方口径","reviews":5956,"snaps":2,"year":""},{"appid":396750,"cn":"永恒空间","name":"永恒空间","now":7.6,"list":76.0,"discount":90,"low":3.8,"low_date":null,"low_source":"官方口径","reviews":11020,"snaps":2,"year":""},{"appid":397540,"cn":"无主之地3","name":"无主之地3","now":19.9,"list":199.0,"discount":90,"low":10.0,"low_date":null,"low_source":"官方口径","reviews":149065,"snaps":1,"year":""},{"appid":402060,"cn":"锎","name":"锎","now":3.64,"list":28.0,"discount":87,"low":2.8,"low_date":null,"low_source":"官方口径","reviews":386,"snaps":2,"year":""},{"appid":415200,"cn":"赛车经理","name":"赛车经理","now":18.0,"list":90.0,"discount":80,"low":13.5,"low_date":null,"low_source":"官方口径","reviews":13636,"snaps":2,"year":""},{"appid":431960,"cn":"Wallpaper Engine：壁纸引擎","name":"Wallpaper Engine：壁纸引擎","now":22.9,"list":22.9,"discount":0,"low":17.0,"low_date":null,"low_source":"官方口径","reviews":894458,"snaps":5,"year":"2018"},{"appid":435100,"cn":"黑暗迷途","name":"黑暗迷途","now":14.9,"list":149.0,"discount":90,"low":14.0,"low_date":null,"low_source":"官方口径","reviews":797,"snaps":2,"year":""},{"appid":446800,"cn":"狂热运输","name":"狂热运输","now":10.8,"list":108.0,"discount":90,"low":10.8,"low_date":"2026-11-09","low_source":"本地快照","reviews":10722,"snaps":2,"year":""},{"appid":458770,"cn":"WRC 6 FIA世界拉力锦标赛","name":"WRC 6 FIA世界拉力锦标赛","now":5.0,"list":50.0,"discount":90,"low":5.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":1445,"snaps":2,"year":""},{"appid":476600,"cn":"Call of Duty®: WWII","name":"Call of Duty®: WWII","now":74.5,"list":298.0,"discount":75,"low":74.5,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2017"},{"appid":477160,"cn":"人类一败涂地","name":"人类一败涂地","now":17.4,"list":58.0,"discount":70,"low":17.4,"low_date":"2026-11-09","low_source":"本地快照","reviews":213640,"snaps":5,"year":""},{"appid":512790,"cn":"奎恩：不死的思想","name":"奎恩：不死的思想","now":7.8,"list":78.0,"discount":90,"low":7.8,"low_date":"2026-11-09","low_source":"本地快照","reviews":3544,"snaps":2,"year":""},{"appid":527230,"cn":"为了吾王","name":"为了吾王","now":7.0,"list":70.0,"discount":90,"low":7.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":41487,"snaps":2,"year":""},{"appid":530950,"cn":"巨塔57","name":"巨塔57","now":3.9,"list":39.0,"discount":90,"low":3.9,"low_date":"2026-11-09","low_source":"本地快照","reviews":786,"snaps":1,"year":""},{"appid":606150,"cn":"夜勤人","name":"夜勤人","now":7.0,"list":70.0,"discount":90,"low":7.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":19913,"snaps":1,"year":""},{"appid":678950,"cn":"龙珠斗士Z","name":"龙珠斗士Z","now":31.68,"list":198.0,"discount":84,"low":29.7,"low_date":null,"low_source":"官方口径","reviews":72976,"snaps":2,"year":""},{"appid":718590,"cn":"黑暗献祭","name":"黑暗献祭","now":7.0,"list":70.0,"discount":90,"low":7.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":2344,"snaps":2,"year":""},{"appid":735580,"cn":"11-11: 回忆复述","name":"11-11: 回忆复述","now":10.2,"list":68.0,"discount":85,"low":10.0,"low_date":null,"low_source":"官方口径","reviews":1977,"snaps":2,"year":""},{"appid":756510,"cn":"Tube2K","name":"Tube2K","now":22.0,"list":22.0,"discount":0,"low":22.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":5,"year":""},{"appid":774241,"cn":"战锤：混沌祸根","name":"战锤：混沌祸根","now":8.8,"list":176.0,"discount":95,"low":8.8,"low_date":"2026-11-09","low_source":"本地快照","reviews":6072,"snaps":2,"year":""},{"appid":940580,"cn":"FIA欧洲卡车锦标赛","name":"FIA欧洲卡车锦标赛","now":9.0,"list":90.0,"discount":90,"low":9.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":381,"snaps":2,"year":""},{"appid":966670,"cn":"The Wanderer: Frankenstein’s Creature","name":"The Wanderer: Frankenstein’s Creature","now":5.4,"list":54.0,"discount":90,"low":5.4,"low_date":"2026-11-09","low_source":"本地快照","reviews":290,"snaps":2,"year":""},{"appid":1004750,"cn":"WRC 8 FIA世界拉力锦标赛","name":"WRC 8 FIA世界拉力锦标赛","now":9.0,"list":90.0,"discount":90,"low":9.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":2031,"snaps":2,"year":""},{"appid":1066780,"cn":"狂热运输2","name":"狂热运输2","now":27.2,"list":136.0,"discount":80,"low":13.6,"low_date":null,"low_source":"官方口径","reviews":27627,"snaps":1,"year":""},{"appid":1067540,"cn":"洛基：北欧怪奇之旅","name":"洛基：北欧怪奇之旅","now":9.9,"list":99.0,"discount":90,"low":9.9,"low_date":"2026-11-09","low_source":"本地快照","reviews":2890,"snaps":1,"year":""},{"appid":1211600,"cn":"隔离区-丧尸末日生存","name":"隔离区-丧尸末日生存","now":28.8,"list":48.0,"discount":40,"low":19.2,"low_date":null,"low_source":"官方口径","reviews":3315,"snaps":5,"year":"2026"},{"appid":1227690,"cn":"断钢","name":"断钢","now":5.6,"list":80.0,"discount":93,"low":4.0,"low_date":null,"low_source":"官方口径","reviews":7113,"snaps":4,"year":""},{"appid":1245620,"cn":"艾尔登法环","name":"艾尔登法环","now":298.0,"list":298.0,"discount":0,"low":178.8,"low_date":null,"low_source":"官方口径","reviews":1056677,"snaps":1,"year":""},{"appid":1283400,"cn":"钢之崛起","name":"钢之崛起","now":13.7,"list":137.0,"discount":90,"low":10.9,"low_date":null,"low_source":"官方口径","reviews":5416,"snaps":2,"year":""},{"appid":1299510,"cn":"吸血鬼：避世血族-绝唱","name":"吸血鬼：避世血族-绝唱","now":7.7,"list":77.0,"discount":90,"low":7.7,"low_date":"2026-11-09","low_source":"本地快照","reviews":433,"snaps":2,"year":""},{"appid":1335230,"cn":"堇的天空","name":"堇的天空","now":3.64,"list":26.0,"discount":86,"low":3.6,"low_date":null,"low_source":"官方口径","reviews":848,"snaps":1,"year":""},{"appid":1342620,"cn":"狼人：启示录-森林之心","name":"狼人：启示录-森林之心","now":5.0,"list":50.0,"discount":90,"low":5.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":1018,"snaps":2,"year":""},{"appid":1345940,"cn":"Anagrams","name":"Anagrams","now":33.0,"list":33.0,"discount":0,"low":6.6,"low_date":null,"low_source":"官方口径","reviews":19,"snaps":5,"year":""},{"appid":1364100,"cn":"黑暗科幻冒险","name":"黑暗科幻冒险","now":5.0,"list":50.0,"discount":90,"low":5.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":2471,"snaps":2,"year":""},{"appid":1502560,"cn":"蓝精灵：毒叶大作战","name":"蓝精灵：毒叶大作战","now":6.2,"list":62.0,"discount":90,"low":6.2,"low_date":"2026-11-09","low_source":"本地快照","reviews":545,"snaps":2,"year":""},{"appid":1519090,"cn":"欢迎来到帕拉迪泽","name":"欢迎来到帕拉迪泽","now":10.8,"list":108.0,"discount":90,"low":10.8,"low_date":"2026-11-09","low_source":"本地快照","reviews":1107,"snaps":2,"year":""},{"appid":1553000,"cn":"战地医院","name":"战地医院","now":5.4,"list":108.0,"discount":95,"low":5.4,"low_date":"2026-11-09","low_source":"本地快照","reviews":1074,"snaps":4,"year":""},{"appid":1619520,"cn":"纵横命途","name":"纵横命途","now":19.5,"list":78.0,"discount":75,"low":19.5,"low_date":"2026-11-09","low_source":"本地快照","reviews":1340,"snaps":4,"year":""},{"appid":1658920,"cn":"王冠之战：黑王子","name":"王冠之战：黑王子","now":3.85,"list":77.0,"discount":95,"low":3.85,"low_date":"2026-11-09","low_source":"本地快照","reviews":491,"snaps":3,"year":""},{"appid":1771300,"cn":"天国：拯救2","name":"天国：拯救2","now":75.24,"list":228.0,"discount":67,"low":75.24,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2025"},{"appid":1912380,"cn":"Soccer Story","name":"Soccer Story","now":7.0,"list":70.0,"discount":90,"low":7.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":124,"snaps":2,"year":""},{"appid":1933000,"cn":"月之深渊","name":"月之深渊","now":68.6,"list":98.0,"discount":30,"low":68.6,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":2,"year":""},{"appid":1985810,"cn":"Call of Duty®: Black Ops Cold War","name":"Call of Duty®: Black Ops Cold War","now":74.5,"list":298.0,"discount":75,"low":74.5,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2023"},{"appid":2017080,"cn":"Nickelodeon All-Star Brawl 2","name":"Nickelodeon All-Star Brawl 2","now":16.8,"list":168.0,"discount":90,"low":16.8,"low_date":"2026-11-09","low_source":"本地快照","reviews":1619,"snaps":2,"year":""},{"appid":2055450,"cn":"Command & Control: Spec Ops (Remastered)","name":"Command & Control: Spec Ops (Remastered)","now":11.05,"list":13.0,"discount":15,"low":11.05,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":2121910,"cn":"Bunny Eureka","name":"Bunny Eureka","now":10.8,"list":18.0,"discount":40,"low":10.8,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":2138710,"cn":"Sifu","name":"Sifu","now":34.75,"list":139.0,"discount":75,"low":34.75,"low_date":"2026-11-15","low_source":"本地快照","reviews":null,"snaps":1,"year":"2023"},{"appid":2223980,"cn":"Nomad Drive","name":"Nomad Drive","now":48.6,"list":54.0,"discount":10,"low":48.6,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":5,"year":""},{"appid":2384980,"cn":"Cafe Simulator","name":"Cafe Simulator","now":37.8,"list":54.0,"discount":30,"low":37.8,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":2396240,"cn":"蒸汽世界：劫掠2","name":"蒸汽世界：劫掠2","now":21.6,"list":108.0,"discount":80,"low":21.6,"low_date":"2026-11-09","low_source":"本地快照","reviews":1885,"snaps":2,"year":""},{"appid":2406770,"cn":"Bodycam","name":"Bodycam","now":102.4,"list":128.0,"discount":20,"low":102.4,"low_date":"2026-11-15","low_source":"本地快照","reviews":null,"snaps":1,"year":"2024"},{"appid":2638080,"cn":"勇者小队全灭了。","name":"勇者小队全灭了。","now":61.2,"list":68.0,"discount":10,"low":61.2,"low_date":"2026-11-15","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":2677970,"cn":"Intergalactic Defenders","name":"Intergalactic Defenders","now":15.3,"list":18.0,"discount":15,"low":15.3,"low_date":"2026-11-15","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":2806540,"cn":"Travellin Cats Advent Calendar","name":"Travellin Cats Advent Calendar","now":28.05,"list":33.0,"discount":15,"low":28.05,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":5,"year":""},{"appid":2854620,"cn":"末日战车：丧尸废土","name":"末日战车：丧尸废土","now":24.75,"list":33.0,"discount":25,"low":24.75,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":2868840,"cn":"Slay the Spire 2","name":"Slay the Spire 2","now":70.4,"list":88.0,"discount":20,"low":70.4,"low_date":"2026-11-15","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":3024130,"cn":"泡泡镇餐厅物语","name":"泡泡镇餐厅物语","now":28.8,"list":48.0,"discount":40,"low":28.8,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":5,"year":""},{"appid":3218350,"cn":"Melvor Idle 2: A RuneScape Adventure","name":"Melvor Idle 2: A RuneScape Adventure","now":52.2,"list":58.0,"discount":10,"low":52.2,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":3240220,"cn":"Grand Theft Auto V 增强版","name":"Grand Theft Auto V 增强版","now":149.0,"list":149.0,"discount":0,"low":149.0,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2025"},{"appid":3241660,"cn":"R.E.P.O.","name":"R.E.P.O.","now":22.75,"list":35.0,"discount":35,"low":22.75,"low_date":"2026-11-09","low_source":"本地快照","reviews":185642,"snaps":5,"year":""},{"appid":3321460,"cn":"红色沙漠：增强版","name":"红色沙漠：增强版","now":214.4,"list":268.0,"discount":20,"low":214.4,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":3415530,"cn":"Ballardo: Roguelike Billiards","name":"Ballardo: Roguelike Billiards","now":32.0,"list":32.0,"discount":0,"low":9.6,"low_date":null,"low_source":"官方口径","reviews":null,"snaps":5,"year":""},{"appid":3433110,"cn":"像素影院物语","name":"像素影院物语","now":40.5,"list":45.0,"discount":10,"low":40.5,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":5,"year":""},{"appid":3527290,"cn":"PEAK","name":"PEAK","now":20.46,"list":33.0,"discount":38,"low":16.5,"low_date":null,"low_source":"官方口径","reviews":null,"snaps":5,"year":"2025"},{"appid":3748520,"cn":"畸域零","name":"畸域零","now":74.4,"list":93.0,"discount":20,"low":74.4,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":3,"year":""},{"appid":3768760,"cn":"007 初露锋芒","name":"007 初露锋芒","now":202.8,"list":338.0,"discount":40,"low":178.8,"low_date":null,"low_source":"官方口径","reviews":null,"snaps":5,"year":""},{"appid":3809270,"cn":"Euro Truck Simulator 2 - Coaches","name":"Euro Truck Simulator 2 - Coaches","now":75.39,"list":75.39,"discount":0,"low":75.39,"low_date":"2026-11-15","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":3816120,"cn":"重生2我独自逆袭","name":"重生2我独自逆袭","now":46.4,"list":58.0,"discount":20,"low":46.4,"low_date":"2026-11-15","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":3832200,"cn":"Save the Forest","name":"Save the Forest","now":46.8,"list":52.0,"discount":10,"low":46.8,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":3922480,"cn":"Racing League Evolution","name":"Racing League Evolution","now":26.0,"list":26.0,"discount":0,"low":26.0,"low_date":"2026-11-15","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":4066520,"cn":"相信直觉","name":"相信直觉","now":27.2,"list":34.0,"discount":20,"low":27.2,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":4080220,"cn":"EA SPORTS FC™ 27","name":"EA SPORTS FC™ 27","now":248.0,"list":248.0,"discount":0,"low":248.0,"low_date":"2026-11-18","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":4115450,"cn":"影之刃零","name":"影之刃零","now":268.0,"list":268.0,"discount":0,"low":268.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":5,"year":"2026"},{"appid":4184810,"cn":"枪奶酪外星人","name":"枪奶酪外星人","now":25.6,"list":32.0,"discount":20,"low":25.6,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":5,"year":""},{"appid":4206910,"cn":"Kimbap Heaven Simulator","name":"Kimbap Heaven Simulator","now":50.15,"list":59.0,"discount":15,"low":41.3,"low_date":null,"low_source":"官方口径","reviews":null,"snaps":5,"year":""},{"appid":4212960,"cn":"Tisuland","name":"Tisuland","now":10.4,"list":13.0,"discount":20,"low":10.4,"low_date":"2026-11-15","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":4348910,"cn":"深空当铺：可能是偷的","name":"深空当铺：可能是偷的","now":55.0,"list":55.0,"discount":0,"low":49.5,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":6,"year":"2026"},{"appid":4435490,"cn":"Call of Duty®: Modern Warfare® 4","name":"Call of Duty®: Modern Warfare® 4","now":298.0,"list":298.0,"discount":0,"low":298.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":5,"year":"2026"},{"appid":4444310,"cn":"Rend","name":"Rend","now":25.0,"list":25.0,"discount":0,"low":25.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":5,"year":""},{"appid":4459590,"cn":"转运军团 - Slotbound","name":"转运军团 - Slotbound","now":37.8,"list":42.0,"discount":10,"low":37.8,"low_date":"2026-11-15","low_source":"本地快照","reviews":null,"snaps":1,"year":"2026"},{"appid":4459600,"cn":"PICK A BOO","name":"PICK A BOO","now":24.8,"list":31.0,"discount":20,"low":24.8,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":5,"year":""},{"appid":4492480,"cn":"抽号小队","name":"抽号小队","now":26.1,"list":29.0,"discount":10,"low":26.1,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":5,"year":""},{"appid":4530370,"cn":"足球经理27","name":"足球经理27","now":268.0,"list":268.0,"discount":0,"low":241.2,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":5,"year":"2026"},{"appid":4611240,"cn":"Music Manager","name":"Music Manager","now":47.2,"list":59.0,"discount":20,"low":47.2,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":4,"year":""},{"appid":4767740,"cn":"The Inspector","name":"The Inspector","now":18.7,"list":22.0,"discount":15,"low":18.7,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":4,"year":""},{"appid":4786370,"cn":"Yokai Idle","name":"Yokai Idle","now":22.0,"list":22.0,"discount":0,"low":22.0,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":4,"year":""},{"appid":4863540,"cn":"Progress98","name":"Progress98","now":10.8,"list":18.0,"discount":40,"low":10.8,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":4,"year":""},{"appid":4920280,"cn":"喵呜风云","name":"喵呜风云","now":13.5,"list":15.0,"discount":10,"low":13.5,"low_date":"2026-11-09","low_source":"本地快照","reviews":null,"snaps":4,"year":""}];
+
+const el = (id) => document.getElementById(id);
+const listEl = el('list'), moreEl = el('more'), qEl = el('q'), clearEl = el('clear');
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function money(n){
+  const s = (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, '');
+  return '¥' + s;
+}
+function reviewText(n){
+  if (!n) return null;
+  return n >= 10000 ? (n / 10000).toFixed(1).replace(/\.0$/, '') + ' 万' : String(n);
+}
+// 匹配：中文名 / 英文名 / appid / 开发商
+function match(g, kw){
+  if (!kw) return true;
+  const k = kw.toLowerCase().trim();
+  return g.cn.toLowerCase().includes(k) || (g.name || '').toLowerCase().includes(k)
+       || String(g.appid).includes(k) || (g.year || '') === k;
+}
+function highlight(text, kw){
+  const safe = esc(text);
+  if (!kw) return safe;
+  const k = kw.trim();
+  if (!k) return safe;
+  const i = text.toLowerCase().indexOf(k.toLowerCase());
+  if (i < 0) return safe;
+  return esc(text.slice(0, i)) + '<mark>' + esc(text.slice(i, i + k.length)) + '</mark>' + esc(text.slice(i + k.length));
+}
+
+function card(g, kw){
+  const atLow = g.now <= g.low + 0.005;
+  const diff = atLow ? 0 : (g.now / g.low - 1) * 100;
+  const cls = atLow ? 'is-low' : 'is-above';
+  const date = g.low_date ? g.low_date : '小黑盒口径 · 无日期';
+  const bits = [];
+  if (g.list && g.list > g.now + 0.005) bits.push('原价 ' + money(g.list));
+  if (g.discount) bits.push('-' + g.discount + '%');
+  const rv = reviewText(g.reviews);
+  if (rv) bits.push('评论 ' + rv);
+  bits.push('本机快照 ' + g.snaps + ' 条');
+  const advice = atLow ? '已经是史低' : '等回 ' + money(g.low);
+  return '<article class="card ' + cls + '">'
+    + '<div class="head">'
+    +   '<h2 class="name">' + highlight(g.cn, kw) + (g.name && g.name !== g.cn ? ' <span class="en">' + highlight(g.name, kw) + '</span>' : '') + '</h2>'
+    +   '<span class="tag ' + (atLow ? 'low' : 'above') + '">' + (atLow ? '现在就是史低' : '还比史低贵 ' + diff.toFixed(0) + '%') + '</span>'
+    + '</div>'
+    + '<div class="grid">'
+    +   '<div class="cell"><span class="k">当前价</span><span class="v">' + money(g.now) + '</span><span class="date">Steam 国区</span></div>'
+    +   '<div class="cell"><span class="k">史低</span><span class="v low">' + money(g.low) + '</span><span class="date">' + esc(date) + '</span></div>'
+    +   '<div class="cell"><span class="k">比史低贵</span><span class="v ' + (atLow ? 'zero' : 'above') + '">' + (atLow ? '0%' : '+' + diff.toFixed(1) + '%') + '</span><span class="date">' + esc(advice) + '</span></div>'
+    + '</div>'
+    + '<p class="foot">' + esc(bits.join(' · ')) + '</p>'
+    + '</article>';
+}
+
+function render(){
+  const kw = qEl.value.trim();
+  clearEl.classList.toggle('on', !!kw);
+  const hits = GAMES.filter(g => match(g, kw));
+  const show = kw ? hits.slice(0, 40) : hits.slice(0, 8);
+  if (!hits.length){
+    listEl.innerHTML = '<p class="empty">没搜到「' + esc(kw) + '」。<br>内嵌数据只有 <code>' + GAMES.length + '</code> 条（这台机器上真采到价的游戏），换个名字试试。</p>';
+    moreEl.textContent = '';
+    return;
+  }
+  listEl.innerHTML = show.map(g => card(g, kw)).join('');
+  if (hits.length > show.length){
+    moreEl.textContent = kw
+      ? '还有 ' + (hits.length - show.length) + ' 条匹配，把名字打全一点能缩到几条。'
+      : '默认只显示 8 条（现在就是史低的优先）。输入名字看你要的那个，共 ' + hits.length + ' 条。';
+  } else {
+    moreEl.textContent = kw ? '共 ' + hits.length + ' 条匹配' : '';
+  }
+}
+
+// 点开就能玩：给几个一定存在的例子
+const CHIPS = ['艾尔登法环', '深空当铺', '冰汽时代', '无主之地2', '人类一败涂地', 'PEAK'];
+function initChips(){
+  el('chips').innerHTML = CHIPS.map(c => '<button class="chip" type="button">' + esc(c) + '</button>').join('');
+  el('chips').addEventListener('click', e => {
+    const b = e.target.closest('.chip');
+    if (!b) return;
+    qEl.value = b.textContent;
+    render();
+    qEl.focus();
+  });
+}
+
+// 排序：现在就是史低的优先 → 评论多（认得出来的）优先 → 折扣大的优先
+GAMES.sort((a, b) => {
+  const la = a.now <= a.low + 0.005 ? 0 : 1, lb = b.now <= b.low + 0.005 ? 0 : 1;
+  if (la !== lb) return la - lb;
+  if ((b.reviews || 0) !== (a.reviews || 0)) return (b.reviews || 0) - (a.reviews || 0);
+  return (b.discount || 0) - (a.discount || 0);
+});
+
+el('total').textContent = GAMES.length;
+initChips();
+qEl.addEventListener('input', render);
+clearEl.addEventListener('click', () => { qEl.value = ''; render(); qEl.focus(); });
+qEl.addEventListener('keydown', e => { if (e.key === 'Escape'){ qEl.value = ''; render(); } });
+
+// 支持 #q=名字 直接进入某个搜索结果（截图 / 分享用）
+const hq = new URLSearchParams(location.hash.slice(1)).get('q');
+if (hq) qEl.value = hq;
+render();
+</script>
+</body>
+</html>
