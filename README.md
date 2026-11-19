@@ -2,6 +2,9 @@
 
 > **Is this game at its all-time low right now — should I buy it today?**
 > 这个游戏现在是史低吗？我该现在买吗？
+[![最新版](https://img.shields.io/github/v/release/HokleinDelrin/hd-deal-radar?label=%E6%9C%80%E6%96%B0%E7%89%88&color=2ea44f)](https://github.com/HokleinDelrin/hd-deal-radar/releases/latest) [![下载量](https://img.shields.io/github/downloads/HokleinDelrin/hd-deal-radar/total?label=%E4%B8%8B%E8%BD%BD&color=1f6feb)](https://github.com/HokleinDelrin/hd-deal-radar/releases)
+
+**Windows 双击即用**：[下载 ShiDiLeiDa.exe](https://github.com/HokleinDelrin/hd-deal-radar/releases/download/v1.0.0/ShiDiLeiDa.exe)（15.4 MB，不需要装环境、不需要注册、不需要 key） · 在线介绍页：<https://hokleindelrin.github.io/hd-deal-radar/>
 
 跨平台 PC 游戏史低聚合 + 按你自己的游玩画像推荐。**Python + 原生 HTML/JS，无构建、无前端依赖；后端只额外要一个 `requests`**，整个应用跑在你自己的电脑上。
 

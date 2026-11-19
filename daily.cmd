@@ -1,11 +1,22 @@
 @echo off
-rem 每日采集入口 —— 给 Windows 计划任务调用。
-rem 为什么不直接把 python 命令写进计划任务：本目录路径含 &（Softwares&Tools），
-rem 在 schtasks 的 /TR 里会被当成命令分隔符；包一层 cmd 最稳，也方便统一日志与 cd。
+rem Daily fetch entry - called by Windows Task Scheduler (game-deal-radar-daily).
+rem
+rem Keep this file ASCII-only. cmd.exe parses .cmd in the OEM codepage, and the
+rem previous version had Chinese comments that got mangled into invalid commands
+rem (task exit code 9009, data stale since 2026-11-15). Any non-ASCII byte here
+rem is a landmine - put explanations in README.md instead.
+rem
+rem Why python is an absolute path: the scheduled task runs with a different
+rem environment than an interactive shell, and bare "python" was not found there.
 chcp 65001 >nul
 cd /d "%~dp0"
 if not exist data mkdir data
 
-rem --once --rounds 1：立刻跑一轮然后退出（自动判断今天是周一全量还是平日轻量）
-python -m radar.cli daemon --once --rounds 1 >> "data\daily.log" 2>&1
+rem --once --rounds 1: run one pass then exit (the program itself decides
+rem whether today is a Monday full refresh or a weekday light refresh).
+rem Use %LOCALAPPDATA% instead of a hardcoded C:\Users\<name> path so the repo
+rem stays free of local account names; fall back to PATH if that copy is gone.
+set "PY=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+if not exist "%PY%" set "PY=python"
+"%PY%" -m radar.cli daemon --once --rounds 1 >> "data\daily.log" 2>&1
 exit /b %errorlevel%
